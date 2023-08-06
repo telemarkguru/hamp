@@ -2,9 +2,10 @@
 Hardware description meta programming in Python
 
 A library with tools for generating and manipulating hardware descriptions at
-Register Transfer Level (RTL).  The output is mainly FIRRTL as this is
-an excellent format for describing hardware and it has great tools for e.g.
-generating Verilog.
+Register Transfer Level (RTL).  The output is mainly FIRRTL
+(https://github.com/chipsalliance/firrtl-spec/blob/main/spec.md) as this is
+an excellent format for describing hardware at a fundamental RTL level
+and it has great tools for e.g. generating Verilog.
 
 The intention is to enable creating of RTL programmatically using
 meta-programming in Python.  This includes:
