@@ -106,6 +106,7 @@ class _IntFactory:
     def __getitem__(self, size: int):
         """Return integer type of given size.
         Usage examples:
+            u1 = uint[1]  # u1 is the unsigned 1 bit integer type
             uint[3]  # 3-bit unsigned integer type
             sint[3](-1)  # 3-bit signed value of -1
         """

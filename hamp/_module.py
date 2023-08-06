@@ -67,7 +67,8 @@ class _Module:
         return _Instance(self, name)
 
     def __setattr__(self, name: str, value: _ModuleMember) -> None:
-        """Add ports, wires, or state to this module"""
+        """Add ports, wires, states, instances, cod
+        or attributes to this module"""
         if name in _Module._VARS:
             super().__setattr__(name, value)
             return
@@ -87,37 +88,39 @@ class _Module:
             value.name = name
 
     def __delitem__(self, name: str) -> None:
-        """Delete port, wire, state or code from this module"""
+        """Delete member from this module"""
         del self._members[name]
 
     def __getattr__(self, name: str) -> _ModuleMember:
-        """Return port, wire, state or code belonging to this module"""
+        """Return member of this module"""
         return self._members[name]
 
     def __setitem__(self, name: str, value: _ModuleMember) -> None:
-        """m[name] = ..."""
+        """Add member to this module"""
         self.__setattr__(name, value)
 
     def __getitem__(self, name: str) -> _ModuleMember:
-        """m[name]"""
+        """Reutrn member with the given name (m[name])"""
         return self._members[name]
 
     def __iter__(self):
+        """Iterate over module members"""
         return iter(self._members)
 
     def __contains__(self, name: str) -> bool:
-        """name in m"""
+        """Return True if the module has a member with the given name, and
+        False if not"""
         return name in self._members
 
     def attr(self, name) -> Any:
-        """Convenience function that return an attribute value"""
+        """Return an value of attribute with the given name"""
         m = self._members[name]
         if not isinstance(m, _Attribute):
             raise KeyError(f"Module member {name} is not an attribute" "")
         return m.value
 
     def clone(self, new_name: str) -> "_Module":
-        """Create a clone of this module with the given name"""
+        """Create and return a clone of this module with the given name"""
         module = _Module(new_name)
         for name in self._members:
             m = self._members[name]
@@ -230,17 +233,17 @@ module = _Module
 
 
 def input(type: _HWType) -> _Port:
-    """Create input module member"""
+    """Create input module member of the given type"""
     return _Port(type, INPUT)
 
 
 def output(type: _HWType) -> _Port:
-    """Create output module member"""
+    """Create output module member of the given type"""
     return _Port(type, OUTPUT)
 
 
 def wire(type: _HWType) -> _Wire:
-    """Create wire module member"""
+    """Create wire module member of the given type"""
     return _Wire(type)
 
 
@@ -250,7 +253,7 @@ def register(
     reset: Union[_Reset, None, bool] = None,
     value: Union[int, _HWType] = 0,
 ) -> _Register:
-    """Create register module member.
+    """Create register module member of the given type.
     The clock is inferred if not specified (the first defined clock
     in the module is used).
     The reset if inferred if not specified (the first defined reset
@@ -269,7 +272,7 @@ def attribute(value: Any):
 
 
 def unique(name: str) -> str:
-    """Generate unique module name given base name"""
+    """Generate unique module name based on given base name"""
     new_name = name
     idx = 0
     while new_name in modules:
