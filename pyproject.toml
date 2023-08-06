@@ -15,6 +15,7 @@ black = "^23.1.0"
 pytest = "^7.4.0"
 pylama = "^8.4.1"
 pytest-cov = "^4.1.0"
+mypy = "^1.4.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -29,3 +30,6 @@ addopts = [
         "--cov-report=term-missing",
         "--cov"
 ]
+
+[tool.mypy]
+files = "hamp/*.py"

@@ -2,7 +2,7 @@
 Hardware modelling types
 """
 
-from typing import Dict
+from typing import Dict, Union, Callable
 
 
 class _HWType:
@@ -48,6 +48,11 @@ class _IntValue:
 
 class _Int(_HWType):
     """Inteber base class"""
+
+    type: str
+    _minval: Union[int, None]
+    _maxval: Union[int, None]
+    _set_min_max: Callable[[int], None]
 
     def __init__(self, size: int = 1):
         self.size = size
