@@ -45,6 +45,9 @@ class _IntValue:
     # TODO: methods to manipulate value to it becomes useful for creating
     # constants and meta-data
 
+    def __repr__(self):
+        return f"{self.type.type}[{self.type.size}]({self.value:#x})"
+
 
 class _Int(_HWType):
     """Inteber base class"""
@@ -59,14 +62,11 @@ class _Int(_HWType):
         self._set_min_max(size)
 
     def __call__(self, value: int = 0):
-        if (
-            (self._minval is None or value >= self._minval)
-            and (self._maxval is None or value <= self._maxval)
+        if (self._minval is None or value >= self._minval) and (
+            self._maxval is None or value <= self._maxval
         ):
             return _IntValue(value, self)
-        raise ValueError(
-            f"{self.type}[{self.size}] cannot hold value {value}"
-        )
+        raise ValueError(f"{self.type}[{self.size}] cannot hold value {value}")
 
 
 class _UInt(_Int):
@@ -89,8 +89,8 @@ class _SInt(_Int):
 
     def _set_min_max(self, size):
         if size > 0:
-            self._minval = - (1 << (self.size-1))
-            self._maxval = (1 << self.size-1) - 1
+            self._minval = -(1 << (self.size - 1))
+            self._maxval = (1 << self.size - 1) - 1
         else:
             self._minval = self._maxval = None
 
