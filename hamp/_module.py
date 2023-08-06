@@ -62,9 +62,9 @@ class _Module:
         self._members: Dict[str, _ModuleMember] = {}
         modules[name] = self
 
-    def __call__(self, name: str = "") -> "_Instance":
+    def __call__(self) -> "_Instance":
         """Create and return and instance of this module."""
-        return _Instance(self, name)
+        return _Instance(self)
 
     def __setattr__(self, name: str, value: _ModuleMember) -> None:
         """Add ports, wires, states, instances, cod
@@ -164,15 +164,17 @@ class _Module:
 class _Instance(_ModuleMember):
     """Module instance module member"""
 
-    def __init__(self, module: _Module, name: str = ""):
+    name: str
+
+    def __init__(self, module: _Module):
         self.module = module
-        self.name = name
+        self.name = ""
 
     def __getattr__(self, name) -> "_Port":
         """Return module port"""
         m = getattr(self.module, name)
         if not isinstance(m, _Port):
-            raise KeyError(
+            raise TypeError(
                 f"Member {name} of module {self.module.name} is not a port"
             )
         return m

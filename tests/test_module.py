@@ -52,7 +52,7 @@ def test_module_instance():
     assert "k" not in m
     assert "j" in m
     with pytest.raises(
-        KeyError, match="Member a of module submodule is not a port"
+        TypeError, match="Member a of module submodule is not a port"
     ):
         m.j.a
 
