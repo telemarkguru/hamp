@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "hamp"
+version = "0.1.0"
+description = "Hardware decription meta programming"
+authors = ["Stefan Sandstrom <telemarkguru@gmail.com>"]
+license = "Apache 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+click = "^8.1.6"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.1.0"
+pytest = "^7.4.0"
+pylama = "^8.4.1"
+pytest-cov = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 79
+
+[tool.pytest.ini_options]
+addopts = [
+        # "--import-mode=importlib",
+        "--cov-report=term-missing",
+        "--cov"
+]
