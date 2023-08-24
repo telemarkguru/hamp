@@ -56,20 +56,20 @@ def create_fifo(size, data_type):
     m.ostb = wire(u1)
 
     @m.code
-    def fifo(self):
-        self.in_ready = self.cnt < size
-        self.out_valid = self.cnt > 0
-        self.istb = self.in_valid and self.in_ready
-        self.ostb = self.out_valid and self.out_ready
-        if self.istb:
-            self.data[iptr] = self.in_data
-            self.iptr = (self.iptr + 1) % size
-        if self.ostb:
-            self.optr = (self.optr + 1) % size
-        if self.istb and not self.ostb:
-            self.cnt = self.cnt + 1
-        elif self.ostb and not self.istb:
-            self.cnt = self.cnt - 1
+    def fifo(mb):
+        mb.in_ready = mb.cnt < size
+        mb.out_valid = mb.cnt > 0
+        mb.istb = mb.in_valid and mb.in_ready
+        mb.ostb = mb.out_valid and mb.out_ready
+        if mb.istb:
+            mb.data[iptr] = mb.in_data
+            mb.iptr = (mb.iptr + 1) % size
+        if mb.ostb:
+            mb.optr = (mb.optr + 1) % size
+        if mb.istb and not mb.ostb:
+            mb.cnt = mb.cnt + 1
+        elif mb.ostb and not mb.istb:
+            mb.cnt = mb.cnt - 1
 
     return m
 
@@ -78,5 +78,37 @@ fifo1 = create_fifo(42, uint[10])
 
 # Add DFT ports:
 fifo1.dft = input(dft_type)
+
+```
+
+## Data types
+
+```Python
+from hamp import struct
+```
+
+## Function calls
+
+```Python
+from hamp import module, input, output, uint
+
+dt = uint[32]
+stages = 10
+
+m = module("module)
+m.din = input(dt)
+m.dout = output(dt)
+m.data = wire(dt[stages])
+
+@m.function
+def stage(mb, idx: int, value: int):
+    mb.data[idx] = mb.data[idx-1] + value
+
+@m.code
+def main(mb):
+    mb.data[0] = m.din
+    for i in range(mb, 1, size):
+        mb.stage(i, -42)
+    mb.dout = m.data[size-1]
 
 ```
