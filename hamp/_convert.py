@@ -2,9 +2,10 @@
 
 from ._ast import parse_func
 import ast
+from typing import List, Tuple, Any, Dict
 
 
-def _member_func_call(var, memb, params):
+def _member_func_call(var: str, memb: str, params: Tuple[Any, ...]):
     """Create and return member function call ast node"""
     node = ast.Call(
         func=ast.Attribute(
@@ -18,7 +19,7 @@ def _member_func_call(var, memb, params):
     return node
 
 
-def _with_node(builder, attr, body, *params):
+def _with_node(builder: str, attr: str, body: ast.AST, *params: Any):
     """Create and return with statment node"""
     node = ast.With(
         items=[
@@ -28,7 +29,7 @@ def _with_node(builder, attr, body, *params):
         ],
         body=body,
     )
-    node._hamp_with = attr
+    setattr(node, "_hamp_with", attr)
     return node
 
 
@@ -37,7 +38,7 @@ class _Replacer(ast.NodeTransformer):
     and logical expressions (and/or/not) with function calls
     """
 
-    def __init__(self, var):
+    def __init__(self, var: str):
         super().__init__()
         self.var = var
 
@@ -72,12 +73,12 @@ class _Replacer(ast.NodeTransformer):
         return node
 
 
-def _replace(tree, var):
+def _replace(tree: ast.AST, var: str):
     tree = ast.fix_missing_locations(_Replacer(var).visit(tree))
     return tree
 
 
-def convert(func):
+def convert(func: function):
     """Convert function to code generator, and return converted function
 
     If statements with hardware expressions are replaced with
@@ -89,59 +90,62 @@ def convert(func):
     var = func.__code__.co_varnames[0]
     dtree = _replace(tree, var)
     srccode = ast.unparse(dtree)
-    syms = {}
+    syms: Dict[str, Any] = {}
     exec(srccode, syms)
     return syms[func.__name__]
 
 
 if __name__ == "__main__":
 
-def func(b):
-    for i in range(3):
-        if b.x[i] <= 1 and b.x[i] > -1 or b.x[i] & 1:
-            b.y[i] = 2
-        elif not(b.x[i] > 2):
-            b.y[i] = 8
-        else:
-            b.y[i] = 3
+    def func(b):
+        for i in range(3):
+            if b.x[i] <= 1 and b.x[i] > -1 or b.x[i] & 1:
+                b.y[i] = 2
+            elif not (b.x[i] > 2):
+                b.y[i] = 8
+            else:
+                b.y[i] = 3
 
+    t = parse_func(func)
+    t2 = _replace(t, func.__code__.co_varnames[0])
+    print(ast.dump(t2, indent="    "))
+    print(ast.unparse(t2))
+    c = convert(func)
+    from contextlib import contextmanager
 
-t = parse_func(func)
-t2 = _replace(t, func.__code__.co_varnames[0])
-print(ast.dump(t2, indent="    "))
-print(ast.unparse(t2))
-c = convert(func)
-from contextlib import contextmanager
+    class m:
+        @contextmanager
+        def if_stmt(self, x):
+            try:
+                yield None
+            finally:
+                pass
 
-class m:
-    @contextmanager
-    def if_stmt(self, x):
-        try:
-            yield None
-        finally:
+        @contextmanager
+        def elif_stmt(self, y):
+            try:
+                yield None
+            finally:
+                pass
+
+        @contextmanager
+        def else_stmt(self):
+            try:
+                yield None
+            finally:
+                pass
+
+        def and_expr(self, *x):
+            return list(x)
+
+        def or_expr(self, *x):
             pass
 
-    @contextmanager
-    def elif_stmt(self, y):
-        try:
-            yield None
-        finally:
+        def not_expr(self, x):
             pass
 
-    @contextmanager
-    def else_stmt(self):
-        try:
-            yield None
-        finally:
-            pass
+        def __init__(self):
+            self.x = [3, 4, 1]
+            self.y = [5, 6, 2]
 
-    def and_expr(self, *x):
-        return list(x)
-    def or_expr(self, *x): pass
-    def not_expr(self, x): pass
-
-    def __init__(self):
-        self.x = [3, 4, 1]
-        self.y = [5, 6, 2]
-
-c(m())
+    c(m())

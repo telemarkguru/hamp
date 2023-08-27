@@ -1,6 +1,11 @@
 """Code builder"""
 
 from contextlib import contextmanager
+from typing import Union, Tuple, List, Unpack
+
+
+ExprType = Union[str, int, "_VarBuilder", Tuple["ExprType", ...]]
+ExprRType = Union[str, int, tuple["ExprType", ...]]
 
 
 class _VarBuilder:
@@ -25,7 +30,7 @@ class _VarBuilder:
             self.builder, f"{self.name}.{name}", getattr(self.item, name)
         )
 
-    def _op2(self, op, value):
+    def _op2(self, op: str, value: ExprType) -> ExprRType:
         if isinstance(value, _VarBuilder):
             value = value.name
         elif isinstance(value, int):
@@ -35,14 +40,17 @@ class _VarBuilder:
                 value = f"sint({value})"
         return (op, self.name, value)
 
-    def __add__(self, value):
+    def __add__(self, value: ExprType) -> ExprRType:
         return self._op2("+", value)
 
-    def __eq__(self, value):
+    def __eq__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
         return self._op2("==", value)
 
-    def __gt__(self, value):
+    def __gt__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
         return self._op2(">", value)
+
+
+CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]
 
 
 class _CodeBuilder:
@@ -50,9 +58,9 @@ class _CodeBuilder:
 
     _VARS = set(("module", "code"))
 
-    def __init__(self, module):
+    def __init__(self, module) -> None:
         self.module = module
-        self.code = []
+        self.code: List[CodeListItemType] = []
 
     def __setattr__(self, name, value):
         """Assign value"""
@@ -63,7 +71,7 @@ class _CodeBuilder:
         # TODO: check that member is output or wire
         self.code.append(("connect", name, value))
 
-    def __str__(self):
+    def __str__(self) -> str:
         text = []
         indent = 0
 

@@ -38,7 +38,7 @@ def test_resets():
 def _assert_value_error(type, value):
     with pytest.raises(
         ValueError,
-        match=re.escape(f"{type.type}[{type.size}] cannot hold value {value}")
+        match=re.escape(f"{type.type}[{type.size}] cannot hold value {value}"),
     ):
         type(value)
 

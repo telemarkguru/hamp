@@ -124,7 +124,6 @@ def _remove_const_if(tree):
 
 
 class _Inliner(ast.NodeTransformer):
-
     def __init__(self, local_vars, prefix):
         super().__init__()
         self.local_vars = set(local_vars)

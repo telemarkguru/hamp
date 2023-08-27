@@ -145,9 +145,9 @@ class _Module:
         """Decorator for adding code to this module, like so:
 
         @a_module.code
-        def data_in(self):
-            if self.in_stb:
-                self.data = self.in_data
+        def data_in(m):
+            if m.in_stb:
+                m.data = m.in_data
 
         The decorated function takes a module instance as its
         only parameter, and should not return anything.
@@ -157,6 +157,18 @@ class _Module:
 
         Can also be called directly:
         a_module.code(a_function)
+        """
+        self.__setattr__(function.__name__, _ModuleCode(function))
+
+    def function(self, function: Callable) -> None:
+        """Decorator for adding hardware generating function, like so:
+
+        @a_module.function
+        def adder(m, a, b):
+            return a + b + m.bias
+
+        The decorated function must take a module bulder instance as its
+        first parameter.
         """
         self.__setattr__(function.__name__, _ModuleFunc(function))
 
@@ -180,10 +192,17 @@ class _Instance(_ModuleMember):
         return m
 
 
-class _ModuleFunc(_ModuleMember):
+class _ModuleCode(_ModuleMember):
     """Code module member"""
 
     def __init__(self, function: Callable[[_Instance], None]):
+        self.function = function
+
+
+class _ModuleFunc(_ModuleMember):
+    """Function module member"""
+
+    def __init__(self, function: Callable):
         self.function = function
 
 

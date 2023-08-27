@@ -74,8 +74,20 @@ def test_module_code():
     def blupp(self):
         return 11
 
-    assert isinstance(m.blupp, mod._ModuleFunc)
+    assert isinstance(m.blupp, mod._ModuleCode)
     assert m.blupp.function(0) == 11
+
+
+def test_module_function():
+    mod.modules.clear()
+    m = mod.module("foo")
+
+    @m.function
+    def f(m, a, b):
+        return a + b
+
+    assert isinstance(m.f, mod._ModuleFunc)
+    assert m.f.function(0, 1, 2) == 3
 
 
 def test_module_add_register():
