@@ -19,35 +19,126 @@ class _VarBuilder:
         self.item = item
 
     def __setattr__(self, name, value):
+        value = _value_str(value)
         if name in _VarBuilder._VARS:
             super().__setattr__(name, value)
             return
         self.builder.code.append(("connect", f"{self.name}.{name}", value))
 
-    def __getattr__(self, name):
+    def __getattr__(self, name) -> "_VarBuilder":
         assert name in self.item
         return _VarBuilder(
             self.builder, f"{self.name}.{name}", getattr(self.item, name)
         )
 
+    def __getitem__(self, idx) -> "_VarBuilder":
+        return _VarBuilder(
+            self.builder, f"{self.name}[idx]", self.item[idx]
+        )
+
+    def __setitem__(self, idx, value):
+        value = _value_str(value)
+        self.buidler.code.append(("connect", f"{self.name}[{idx}]", value))
+
     def _op2(self, op: str, value: ExprType) -> ExprRType:
-        if isinstance(value, _VarBuilder):
-            value = value.name
-        elif isinstance(value, int):
-            if value >= 0:
-                value = f"uint({value})"
-            else:
-                value = f"sint({value})"
+        value = _value_str(value)
         return (op, self.name, value)
+
+    def _rop2(self, op: str, value: ExprType) -> ExprRType:
+        value = _value_str(value)
+        return (op, value, self.name)
+
+    def _op1(self, op: str) -> ExprRType:
+        return (op, self.name)
 
     def __add__(self, value: ExprType) -> ExprRType:
         return self._op2("+", value)
 
+    def __radd__(self, value: ExprType) -> ExprRType:
+        return self._rop2("+", value)
+
+    def __sub__(self, value: ExprType) -> ExprRType:
+        return self._op2("-", value)
+
+    def __rsub__(self, value: ExprType) -> ExprRType:
+        return self._rop2("-", value)
+
+    def __mul__(self, value: ExprType) -> ExprRType:
+        return self._op2("*", value)
+
+    def __rmul__(self, value: ExprType) -> ExprRType:
+        return self._rop2("*", value)
+
+    def __mod__(self, value: ExprType) -> ExprRType:
+        return self._op2("%", value)
+
+    def __rmod__(self, value: ExprType) -> ExprRType:
+        return self._rop2("%", value)
+
+    def __or__(self, value: ExprType) -> ExprRType:
+        return self._op2("|", value)
+
+    def __ror__(self, value: ExprType) -> ExprRType:
+        return self._rop2("|", value)
+
+    def __and__(self, value: ExprType) -> ExprRType:
+        return self._op2("&", value)
+
+    def __rand__(self, value: ExprType) -> ExprRType:
+        return self._rop2("&", value)
+
+    def __xor__(self, value: ExprType) -> ExprRType:
+        return self._op2("^", value)
+
+    def __rxor__(self, value: ExprType) -> ExprRType:
+        return self._rop2("^", value)
+
+    def __lshift__(self, value: ExprType) -> ExprRType:
+        return self._op2("<<", value)
+
+    def __rlshift__(self, value: ExprType) -> ExprRType:
+        return self._rop2("<<", value)
+
+    def __rshift__(self, value: ExprType) -> ExprRType:
+        return self._op2(">>", value)
+
+    def __rrshift__(self, value: ExprType) -> ExprRType:
+        return self._rop2(">>", value)
+
+    def __neg__(self) -> ExprRType:
+        return self._op1("neg")
+
+    def __pos__(self) -> ExprRType:
+        return self._op1("pos")
+
     def __eq__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
         return self._op2("==", value)
 
+    def __ge__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
+        return self._op2(">=", value)
+
     def __gt__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
         return self._op2(">", value)
+
+    def __le__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
+        return self._op2("<=", value)
+
+    def __lt__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
+        return self._op2("<", value)
+
+    def __ne__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
+        return self._op2("!=", value)
+
+
+def _value_str(value: ExprType) -> ExprRType:
+    if isinstance(value, _VarBuilder):
+        return value.name
+    if isinstance(value, int):
+        if value >= 0:
+            return f"uint({value})"
+        else:
+            return f"sint({value})"
+    return value
 
 
 CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]

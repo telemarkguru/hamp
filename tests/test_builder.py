@@ -62,23 +62,92 @@ def test_op2():
 
     b = _setup()
 
-    def chk(op, v="z"):
-        assert b.code[-1] == ("connect", "x", (op, "y", v))
+    def chk(op, v0="y", v1="z"):
+        assert b.code[-1] == ("connect", "x", (op, v0, v1))
 
     b.x = b.y + b.z
     chk("+")
 
+    b.x = 1 + b.z
+    chk("+", v0="uint(1)")
+
+    b.x = b.y - b.z
+    chk("-")
+
+    b.x = -1 - b.z
+    chk("-", v0="sint(-1)")
+
+    b.x = b.y * b.z
+    chk("*")
+
+    b.x = 10 * b.z
+    chk("*", v0="uint(10)")
+
+    b.x = b.y % b.z
+    chk("%")
+
+    b.x = 11 % b.z
+    chk("%", v0="uint(11)")
+
+    b.x = b.y >> b.z
+    chk(">>")
+
+    b.x = 11 >> b.z
+    chk(">>", v0="uint(11)")
+
+    b.x = b.y << b.z
+    chk("<<")
+
+    b.x = 3 << b.z
+    chk("<<", v0="uint(3)")
+
+    b.x = b.y | b.z
+    chk("|")
+
+    b.x = 0x7 | b.z
+    chk("|", v0="uint(7)")
+
+    b.x = b.y & b.z
+    chk("&")
+
+    b.x = 0x7 & b.z
+    chk("&", v0="uint(7)")
+
+    b.x = b.y ^ b.z
+    chk("^")
+
+    b.x = 0x7 ^ b.z
+    chk("^", v0="uint(7)")
+
     b.x = b.y == b.z
     chk("==")
+
+    b.x = b.y != b.z
+    chk("!=")
 
     b.x = b.y > b.z
     chk(">")
 
     b.x = b.y > 1
-    chk(">", "uint(1)")
+    chk(">", v1="uint(1)")
 
     b.x = b.y > -10
-    chk(">", "sint(-10)")
+    chk(">", v1="sint(-10)")
+
+    b.x = b.y >= b.z
+    chk(">=")
+
+    b.x = b.y < b.z
+    chk("<")
+
+    b.x = b.y <= b.z
+    chk("<=")
+
+    b.x = +b.y
+    assert b.code[-1] == ("connect", "x", ("pos", "y"))
+
+    b.x = -b.y
+    assert b.code[-1] == ("connect", "x", ("neg", "y"))
 
 
 def test_logop():
