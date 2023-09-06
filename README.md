@@ -4,11 +4,11 @@ Hardware description meta programming in Python
 A library with tools for generating and manipulating hardware descriptions at
 Register Transfer Level (RTL).  The output is mainly FIRRTL
 (https://github.com/chipsalliance/firrtl-spec/blob/main/spec.md) as this is
-an excellent format for describing hardware at a fundamental RTL level
+an excellent format for describing hardware as fundamental RTL
 and it has great tools for e.g. generating Verilog.
 
-The intention is to enable creating of RTL programmatically using
-meta-programming in Python.  This includes:
+The intention is to enable creation and manipulation of RTL programmatically
+using meta-programming in Python.  This includes:
 
 - Creating RTL modules
 - Populating RTL modules with
@@ -16,6 +16,7 @@ meta-programming in Python.  This includes:
     - Output ports
     - Wires/signals
     - Registers
+    - Memories
     - Instantiations of other modules
     - Behavioral code and connections
     - Meta-data about the module or its content
@@ -23,17 +24,19 @@ meta-programming in Python.  This includes:
 - Manipulate module hierarchies
 - Manipulate modules:
     - Cloning a module and give it a new name
-    - Add and remove ports, signals, code, instances, meta-data etc.
+    - Add, remove and rename modules, ports, signals, code, instances,
+      meta-data etc.
 
-- Define RTL composite types (structs).
+- Define RTL composite types (structs and arrays).
 
 A simple example:
 ```Python
 from hamp import module, input, output, wire, register, uint
 
-u1 = uint[1]
 
 def create_fifo(size, data_type):
+
+    u1 = uint[1]
 
     ptr_type = uint[(size-1).bit_length()]
     cnt_type = uint[size.bit_length()]
