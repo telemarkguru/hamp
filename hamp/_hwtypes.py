@@ -8,7 +8,9 @@ from typing import Dict, Union, Callable
 class _HWType:
     """Base class for all hardware modelling types"""
 
-    pass
+    def __getitem__(self, size: int) -> "_Array":
+        """Create array type"""
+        return _Array(self, size)
 
 
 class _Clock(_HWType):
@@ -50,7 +52,7 @@ class _IntValue:
 
 
 class _Int(_HWType):
-    """Inteber base class"""
+    """Integer type base class"""
 
     type: str
     _minval: Union[int, None]
@@ -67,6 +69,9 @@ class _Int(_HWType):
         ):
             return _IntValue(value, self)
         raise ValueError(f"{self.type}[{self.size}] cannot hold value {value}")
+
+    def __repr__(self):
+        return f"{self.type}[{self.size}]"
 
 
 class _UInt(_Int):
@@ -93,6 +98,16 @@ class _SInt(_Int):
             self._maxval = (1 << self.size - 1) - 1
         else:
             self._minval = self._maxval = None
+
+
+class _Array(_HWType):
+
+    def __init__(self, type: _HWType, size: int):
+        self.type = type
+        self.size = size
+
+    def __repr__(self):
+        return f"{repr(self.type)}[{self.size}]"
 
 
 class _IntFactory:

@@ -75,3 +75,11 @@ def test_sint_values():
     _assert_value_error(t2, -4)
     _assert_value_error(t2, 2)
     _assert_value_error(t2, 3)
+
+
+def test_arrays():
+    t1 = hw.uint[3]
+    a1 = t1[10]
+    assert repr(a1) == "uint[3][10]"
+    assert a1.size == 10
+    assert a1.type == hw.uint[3]

@@ -206,7 +206,12 @@ class _ModuleFunc(_ModuleMember):
         self.function = function
 
 
-class _Port(_ModuleMember):
+class _DataMember(_ModuleMember):
+    """A member holding data"""
+    pass
+
+
+class _Port(_DataMember):
     """Port module member"""
 
     def __init__(self, type: _HWType, direction: _Direction):
@@ -214,14 +219,14 @@ class _Port(_ModuleMember):
         self.direction = direction
 
 
-class _Wire(_ModuleMember):
+class _Wire(_DataMember):
     """Wire module member"""
 
     def __init__(self, type: _HWType):
         self.type = type
 
 
-class _Register(_ModuleMember):
+class _Register(_DataMember):
     """State module member"""
 
     def __init__(

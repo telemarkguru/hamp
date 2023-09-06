@@ -17,7 +17,7 @@ def _setup():
 def test_code_builder():
     b = _setup()
     b.x = 3
-    assert b.code == [("connect", "x", 3)]
+    assert b.code == [("connect", "x", "uint(3)")]
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
@@ -28,14 +28,14 @@ def test_code_builder():
         b.x = 0
 
     assert b.code == [
-        ("connect", "x", 3),
+        ("connect", "x", "uint(3)"),
         ("connect", "x", ("+", "y", "z")),
         ("when", ("==", "y", "z")),
-        ("connect", "x", -1),
+        ("connect", "x", "sint(-1)"),
         ("else_when", (">", "y", "z")),
-        ("connect", "x", 10),
+        ("connect", "x", "uint(10)"),
         ("else",),
-        ("connect", "x", 0),
+        ("connect", "x", "uint(0)"),
         ("end_when",),
     ]
 
@@ -43,14 +43,14 @@ def test_code_builder():
         str(b)
         == dedent(
             """
-        ('connect', 'x', 3)
+        ('connect', 'x', 'uint(3)')
         ('connect', 'x', ('+', 'y', 'z'))
         ('when', ('==', 'y', 'z'))
-            ('connect', 'x', -1)
+            ('connect', 'x', 'sint(-1)')
         ('else_when', ('>', 'y', 'z'))
-            ('connect', 'x', 10)
+            ('connect', 'x', 'uint(10)')
         ('else',)
-            ('connect', 'x', 0)
+            ('connect', 'x', 'uint(0)')
         ('end_when',)
     """
         ).strip()

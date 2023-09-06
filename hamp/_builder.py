@@ -2,6 +2,8 @@
 
 from contextlib import contextmanager
 from typing import Union, Tuple, List, Unpack
+from . import _module
+from . import _hwtypes
 
 
 ExprType = Union[str, int, "_VarBuilder", Tuple["ExprType", ...]]
@@ -26,17 +28,32 @@ class _VarBuilder:
         self.builder.code.append(("connect", f"{self.name}.{name}", value))
 
     def __getattr__(self, name) -> "_VarBuilder":
-        assert name in self.item
+        if name not in self.item:
+            raise AttributeError(f"{self.name} has no member {name}")
         return _VarBuilder(
             self.builder, f"{self.name}.{name}", getattr(self.item, name)
         )
 
+    def _chk_idx(self, idx):
+        if not isinstance(self.item, _hwtypes._Array):
+            raise TypeError(f"{self.name} is not an array")
+        if isinstance(idx, int):
+            size = self.item.size
+            if not 0 <= x < size:
+                raise IndexError(
+                    f"{self.name}[{idx}] is out of range (size={size})"
+                )
+            idx = str(idx)
+        return _value_str(idx)
+
     def __getitem__(self, idx) -> "_VarBuilder":
+        idx = self._chk_idx(idx)
         return _VarBuilder(
-            self.builder, f"{self.name}[idx]", self.item[idx]
+            self.builder, f"{self.name}[{idx}]", self.item.type
         )
 
     def __setitem__(self, idx, value):
+        idx = self._chk_idx(idx)
         value = _value_str(value)
         self.buidler.code.append(("connect", f"{self.name}[{idx}]", value))
 
@@ -159,8 +176,10 @@ class _CodeBuilder:
             super().__setattr__(name, value)
             return
         assert name in self.module
+        item = self.module[name]
+        assert isinstance(item, _module._DataMember)
         # TODO: check that member is output or wire
-        self.code.append(("connect", name, value))
+        self.code.append(("connect", name, _value_str(value)))
 
     def __str__(self) -> str:
         text = []
@@ -186,7 +205,9 @@ class _CodeBuilder:
 
     def __getattr__(self, name):
         assert name in self.module
-        return _VarBuilder(self, name, getattr(self.module, name))
+        item = self.module[name]
+        assert isinstance(item, _module._DataMember)
+        return _VarBuilder(self, name, item.type)
 
     @contextmanager
     def if_stmt(self, expr):
