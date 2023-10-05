@@ -208,6 +208,7 @@ class _ModuleFunc(_ModuleMember):
 
 class _DataMember(_ModuleMember):
     """A member holding data"""
+
     pass
 
 

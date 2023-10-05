@@ -40,3 +40,19 @@ def flip(type):
 
     """
     return type, True
+
+
+def member(cls, name: str) -> type:
+    """Return member type if struct class has member with given name.
+    Return None if not.
+    """
+    if hasattr(cls, "__hamp_struct__"):
+        return cls.__annotations__.get(name)
+    return None
+
+
+def hasmember(cls, name: str) -> bool:
+    """Return True if struct class has member with given name.
+    Return False if not.
+    """
+    return member(cls, name) is not None

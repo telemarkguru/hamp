@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from typing import Union, Tuple, List, Unpack
 from . import _module
 from . import _hwtypes
+from ._struct import member
 
 
 ExprType = Union[str, int, "_VarBuilder", Tuple["ExprType", ...]]
@@ -28,18 +29,34 @@ class _VarBuilder:
         self.builder.code.append(("connect", f"{self.name}.{name}", value))
 
     def __getattr__(self, name) -> "_VarBuilder":
-        if name not in self.item:
+        if m := member(self.item, name):
+            item = m
+        elif hasattr(self.item, name):
+            item = getattr(self.item, name)
+        else:
             raise AttributeError(f"{self.name} has no member {name}")
-        return _VarBuilder(
-            self.builder, f"{self.name}.{name}", getattr(self.item, name)
-        )
+        return _VarBuilder(self.builder, f"{self.name}.{name}", item)
+
+    def _chk_slice(self, slice):
+        if not isinstance(self.item, _hwtypes._Int):
+            raise TypeError(f"{self.name} is not a bit-vector")
+        error = None
+        if not (isinstance(slice.start, int) and isinstance(slice.stop, int)):
+            error = "Slice indexes must be integer constants"
+        elif slice.step is not None:
+            error = "Step in slice index not allowed"
+        elif slice.stop > slice.start:
+            error = "Slice MSB must be equal to or larger than LSB"
+        if error:
+            slicestr = str(slice)[6:-1].replace(", ", ":")
+            raise IndexError(f"{error}: {self.name}[{slicestr}]")
 
     def _chk_idx(self, idx):
         if not isinstance(self.item, _hwtypes._Array):
             raise TypeError(f"{self.name} is not an array")
         if isinstance(idx, int):
             size = self.item.size
-            if not 0 <= x < size:
+            if not 0 <= idx < size:
                 raise IndexError(
                     f"{self.name}[{idx}] is out of range (size={size})"
                 )
@@ -47,15 +64,16 @@ class _VarBuilder:
         return _value_str(idx)
 
     def __getitem__(self, idx) -> "_VarBuilder":
+        if isinstance(idx, slice):
+            self._chk_slice(idx)
+            return ("bits", self.name, idx.start, idx.stop)
         idx = self._chk_idx(idx)
-        return _VarBuilder(
-            self.builder, f"{self.name}[{idx}]", self.item.type
-        )
+        return _VarBuilder(self.builder, f"{self.name}[{idx}]", self.item.type)
 
     def __setitem__(self, idx, value):
         idx = self._chk_idx(idx)
         value = _value_str(value)
-        self.buidler.code.append(("connect", f"{self.name}[{idx}]", value))
+        self.builder.code.append(("connect", f"{self.name}[{idx}]", value))
 
     def _op2(self, op: str, value: ExprType) -> ExprRType:
         value = _value_str(value)

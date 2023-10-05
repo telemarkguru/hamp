@@ -1,4 +1,4 @@
-from hamp._struct import struct, flip
+from hamp._struct import struct, flip, hasmember
 from hamp._hwtypes import uint, sint
 import pytest
 
@@ -26,6 +26,12 @@ def test_hier_struct():
         b: Foo
 
     x = Bar()
+
+    assert hasmember(Bar, "a")
+    assert hasmember(Bar, "b")
+    assert hasmember(Foo, "a")
+    assert hasmember(Foo, "b")
+
     assert x.a.a.value == 0
     assert x.a.b.value == 0
     assert x.b.a.value == 0

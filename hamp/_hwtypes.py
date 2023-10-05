@@ -101,7 +101,6 @@ class _SInt(_Int):
 
 
 class _Array(_HWType):
-
     def __init__(self, type: _HWType, size: int):
         self.type = type
         self.size = size

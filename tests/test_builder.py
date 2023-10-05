@@ -1,7 +1,22 @@
 from hamp._builder import _VarBuilder, _CodeBuilder
 from hamp._module import module, input, output, wire, modules
 from hamp._hwtypes import uint, sint
+from hamp._struct import struct
 from textwrap import dedent
+from pytest import raises
+
+
+@struct
+class A:
+    a: uint[2]
+    b: uint[2]
+
+
+@struct
+class B:
+    c: A
+    d: A
+    e: sint[4]
 
 
 def _setup():
@@ -10,6 +25,8 @@ def _setup():
     m.x = wire(uint[10])
     m.y = wire(uint[10])
     m.z = wire(uint[10])
+    m.s = wire(uint[10][20])
+    m.b = wire(B)
     b = _CodeBuilder(m)
     return b
 
@@ -163,3 +180,58 @@ def test_logop():
 
     b.x = b.not_expr(b.y)
     assert b.code[-1] == ("connect", "x", ("not", "y"))
+
+
+def test_bit_slicing():
+    """Test var[x:y]"""
+
+    b = _setup()
+    b.y = b.x[3:2]
+    assert b.code[-1] == ("connect", "y", ("bits", "x", 3, 2))
+
+    with raises(TypeError, match="s is not a bit-vector"):
+        b.y = b.s[3:2]
+
+    with raises(IndexError, match="Slice indexes must be integer constants"):
+        b.y = b.x[b.z : 2]
+
+    with raises(IndexError, match="Slice indexes must be integer constants"):
+        b.y = b.x[2 : b.z]
+
+    with raises(IndexError, match="Step in slice index not allowed"):
+        b.y = b.x[2:1:3]
+
+    with raises(IndexError, match="Slice MSB must be equal to or larger"):
+        b.y = b.x[1:3]
+
+
+def test_array_indexing():
+    """Test x[y] = z, x = y[z], etc"""
+
+    b = _setup()
+
+    b.y = b.s[b.x]
+    assert b.code[-1] == ("connect", "y", "s[x]")
+
+    b.y = b.s[1]
+    assert b.code[-1] == ("connect", "y", "s[1]")
+
+    b.s[b.x] = b.y
+    assert b.code[-1] == ("connect", "s[x]", "y")
+
+    with raises(IndexError, match=r"s\[21\] is out of range \(size=20\)"):
+        b.y = b.s[21]
+
+    with raises(TypeError, match=r"x is not an array"):
+        b.y = b.x[2]
+
+
+def test_struct_member_access():
+    """Test x.a, a.b.c etc"""
+
+    b = _setup()
+
+    b.b.c.a = b.b.d.b
+
+    with raises(AttributeError, match=r"has no member bix"):
+        b.b.c.bix
