@@ -1,4 +1,4 @@
-from hamp._builder import _VarBuilder, _CodeBuilder
+from hamp._builder import _CodeBuilder
 from hamp._module import module, input, output, wire, modules
 from hamp._hwtypes import uint, sint
 from hamp._struct import struct
@@ -22,8 +22,8 @@ class B:
 def _setup():
     modules.clear()
     m = module("mod")
-    m.x = wire(uint[10])
-    m.y = wire(uint[10])
+    m.x = output(uint[10])
+    m.y = input(uint[10])
     m.z = wire(uint[10])
     m.s = wire(uint[10][20])
     m.b = wire(B)

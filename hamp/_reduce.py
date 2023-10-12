@@ -1,4 +1,3 @@
-import inspect
 import ast
 from ._ast import parse_func
 

@@ -1,7 +1,7 @@
 """Code builder"""
 
 from contextlib import contextmanager
-from typing import Union, Tuple, List, Unpack
+from typing import Union, Tuple, List, Any
 from . import _module
 from . import _hwtypes
 from ._struct import member
@@ -63,7 +63,7 @@ class _VarBuilder:
             idx = str(idx)
         return _value_str(idx)
 
-    def __getitem__(self, idx) -> "_VarBuilder":
+    def __getitem__(self, idx) -> Union["_VarBuilder", ExprRType]:
         if isinstance(idx, slice):
             self._chk_slice(idx)
             return ("bits", self.name, idx.start, idx.stop)
@@ -176,7 +176,8 @@ def _value_str(value: ExprType) -> ExprRType:
     return value
 
 
-CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]
+# CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]
+CodeListItemType = Tuple[Any, ...]
 
 
 class _CodeBuilder:
@@ -188,7 +189,7 @@ class _CodeBuilder:
         self.module = module
         self.code: List[CodeListItemType] = []
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value) -> None:
         """Assign value"""
         if name in _CodeBuilder._VARS:
             super().__setattr__(name, value)
@@ -221,7 +222,7 @@ class _CodeBuilder:
                 pr(c)
         return "\n".join(text)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> _VarBuilder:
         assert name in self.module
         item = self.module[name]
         assert isinstance(item, _module._DataMember)

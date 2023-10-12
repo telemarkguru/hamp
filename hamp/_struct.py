@@ -1,7 +1,8 @@
 """Composit data types"""
 
 from dataclasses import dataclass, field
-from ._hwtypes import uint, sint, _Int
+from ._hwtypes import _Int
+from typing import Union
 
 
 def struct(c):
@@ -42,7 +43,7 @@ def flip(type):
     return type, True
 
 
-def member(cls, name: str) -> type:
+def member(cls, name: str) -> Union[type, None]:
     """Return member type if struct class has member with given name.
     Return None if not.
     """

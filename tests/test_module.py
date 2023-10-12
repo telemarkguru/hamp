@@ -9,7 +9,7 @@ def test_create_module():
     assert isinstance(m, mod._Module)
     assert m.name == "name"
     with pytest.raises(NameError, match=r"Redefinition of module name"):
-        x = mod.module("name")
+        mod.module("name")
 
 
 def test_clone_module():
@@ -17,7 +17,7 @@ def test_clone_module():
     m = mod.module("name")
     m.x = mod.input(uint[1])
     m.y = mod.wire(uint[2])
-    c = m.clone("name2")
+    m.clone("name2")
     assert list(mod.modules.keys()) == ["name", "name2"]
 
 
@@ -120,7 +120,7 @@ def test_module_register_no_reset():
 
 def test_unique_module_name():
     mod.modules.clear()
-    m = mod.module("foo")
+    mod.module("foo")
     m2 = mod.module(mod.unique("foo"))
     assert m2.name == "foo_1"
 
