@@ -2,7 +2,7 @@
 Code for the module class and associated features.
 """
 
-from typing import Callable, Union, Any, Dict
+from typing import Callable, Union, Any, Dict, Iterator
 from ._hwtypes import (
     _HWType,
     _Clock,
@@ -24,7 +24,7 @@ class _ModuleMember:
         return deepcopy(self)
 
 
-def _is_clock_input(i):
+def _is_clock_input(i: _ModuleMember) -> bool:
     return (
         isinstance(i, _Port)
         and i.direction == INPUT
@@ -32,7 +32,7 @@ def _is_clock_input(i):
     )
 
 
-def _is_reset_input(i):
+def _is_reset_input(i: _ModuleMember) -> bool:
     return (
         isinstance(i, _Port)
         and i.direction == INPUT
@@ -103,7 +103,7 @@ class _Module:
         """Reutrn member with the given name (m[name])"""
         return self._members[name]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[_ModuleMember]:
         """Iterate over module members"""
         return iter(self._members)
 
@@ -111,6 +111,12 @@ class _Module:
         """Return True if the module has a member with the given name, and
         False if not"""
         return name in self._members
+
+    def _iter_types(self, *types) -> Iterator[_ModuleMember]:
+        for name in self:
+            m = self[name]
+            if isinstance(m, types):
+                yield name, m
 
     def attr(self, name) -> Any:
         """Return an value of attribute with the given name"""
@@ -173,7 +179,51 @@ class _Module:
         self.__setattr__(function.__name__, _ModuleFunc(function))
 
 
-class _Instance(_ModuleMember):
+class _DataMember(_ModuleMember):
+    """A member holding data"""
+
+    type: _HWType
+
+
+class _Port(_DataMember):
+    """Port module member"""
+
+    def __init__(self, type: _HWType, direction: _Direction):
+        self.type = type
+        self.direction = direction
+
+
+class _LocalDataMember(_DataMember):
+    pass
+
+
+class _Wire(_LocalDataMember):
+    """Wire module member"""
+
+    def __init__(self, type: _HWType):
+        self.type = type
+
+
+class _Register(_LocalDataMember):
+    """State module member"""
+
+    def __init__(
+        self,
+        type: _HWType,
+        clock: Union[_Clock, None],
+        reset: Union[_Reset, None, bool],
+        value: Union[int, _HWType],
+    ):
+        self.type = type
+        self.clock = clock
+        self.reset = reset
+        self.value = value
+
+    # TODO: Add attributes to registers to make it possible to
+    # annotate CSR info to a register
+
+
+class _Instance(_LocalDataMember):
     """Module instance module member"""
 
     name: str
@@ -192,58 +242,22 @@ class _Instance(_ModuleMember):
         return m
 
 
-class _ModuleCode(_ModuleMember):
+class _CodeItem(_ModuleMember):
+    pass
+
+
+class _ModuleCode(_CodeItem):
     """Code module member"""
 
     def __init__(self, function: Callable[[_Instance], None]):
         self.function = function
 
 
-class _ModuleFunc(_ModuleMember):
+class _ModuleFunc(_CodeItem):
     """Function module member"""
 
     def __init__(self, function: Callable):
         self.function = function
-
-
-class _DataMember(_ModuleMember):
-    """A member holding data"""
-
-    type: _HWType
-
-
-class _Port(_DataMember):
-    """Port module member"""
-
-    def __init__(self, type: _HWType, direction: _Direction):
-        self.type = type
-        self.direction = direction
-
-
-class _Wire(_DataMember):
-    """Wire module member"""
-
-    def __init__(self, type: _HWType):
-        self.type = type
-
-
-class _Register(_DataMember):
-    """State module member"""
-
-    def __init__(
-        self,
-        type: _HWType,
-        clock: Union[_Clock, None],
-        reset: Union[_Reset, None, bool],
-        value: Union[int, _HWType],
-    ):
-        self.type = type
-        self.clock = clock
-        self.reset = reset
-        self.value = value
-
-    # TODO: Add attributes to registers to make it possible to
-    # annotate CSR info to a register
 
 
 class _Attribute(_ModuleMember):
@@ -313,3 +327,8 @@ def instance(name: str) -> _Instance:
     if not (m := modules.get(name)):
         raise NameError(f"No module named {name} defined")
     return m()
+
+
+def ports(m: _Module) -> Iterator[_Port]:
+    """Iterate over ports"""
+    return m._iter_types(_Port)

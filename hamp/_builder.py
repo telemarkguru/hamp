@@ -170,9 +170,9 @@ def _value_str(value: ExprType) -> ExprRType:
         return value.name
     if isinstance(value, int):
         if value >= 0:
-            return f"uint({value})"
+            return f"UInt({value})"
         else:
-            return f"sint({value})"
+            return f"SInt({value})"
     return value
 
 
@@ -185,7 +185,7 @@ class _CodeBuilder:
 
     _VARS = set(("module", "code"))
 
-    def __init__(self, module) -> None:
+    def __init__(self, module: _module._Module):
         self.module = module
         self.code: List[CodeListItemType] = []
 
@@ -200,26 +200,27 @@ class _CodeBuilder:
         # TODO: check that member is output or wire
         self.code.append(("connect", name, _value_str(value)))
 
-    def __str__(self) -> str:
-        text = []
+    def iter_with_indent(self):
         indent = 0
-
-        def pr(x):
-            text.append(f"{' ' * (indent*4)}{x}")
 
         for c in self.code:
             if c[0] == "end_when":
                 indent -= 1
-                pr(c)
+                yield c, indent
             elif c[0] == "when":
-                pr(c)
+                yield c, indent
                 indent += 1
             elif c[0] in ("else_when", "else"):
                 indent -= 1
-                pr(c)
+                yield c, indent
                 indent += 1
             else:
-                pr(c)
+                yield c, indent
+
+    def __str__(self) -> str:
+        text = []
+        for c, indent in self.iter_with_indent():
+            text.append(f"{' ' * (indent*4)}{c}")
         return "\n".join(text)
 
     def __getattr__(self, name: str) -> _VarBuilder:

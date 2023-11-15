@@ -34,7 +34,7 @@ def _setup():
 def test_code_builder():
     b = _setup()
     b.x = 3
-    assert b.code == [("connect", "x", "uint(3)")]
+    assert b.code == [("connect", "x", "UInt(3)")]
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
@@ -45,14 +45,14 @@ def test_code_builder():
         b.x = 0
 
     assert b.code == [
-        ("connect", "x", "uint(3)"),
+        ("connect", "x", "UInt(3)"),
         ("connect", "x", ("+", "y", "z")),
         ("when", ("==", "y", "z")),
-        ("connect", "x", "sint(-1)"),
+        ("connect", "x", "SInt(-1)"),
         ("else_when", (">", "y", "z")),
-        ("connect", "x", "uint(10)"),
+        ("connect", "x", "UInt(10)"),
         ("else",),
-        ("connect", "x", "uint(0)"),
+        ("connect", "x", "UInt(0)"),
         ("end_when",),
     ]
 
@@ -60,14 +60,14 @@ def test_code_builder():
         str(b)
         == dedent(
             """
-        ('connect', 'x', 'uint(3)')
+        ('connect', 'x', 'UInt(3)')
         ('connect', 'x', ('+', 'y', 'z'))
         ('when', ('==', 'y', 'z'))
-            ('connect', 'x', 'sint(-1)')
+            ('connect', 'x', 'SInt(-1)')
         ('else_when', ('>', 'y', 'z'))
-            ('connect', 'x', 'uint(10)')
+            ('connect', 'x', 'UInt(10)')
         ('else',)
-            ('connect', 'x', 'uint(0)')
+            ('connect', 'x', 'UInt(0)')
         ('end_when',)
     """
         ).strip()
@@ -86,55 +86,55 @@ def test_op2():
     chk("+")
 
     b.x = 1 + b.z
-    chk("+", v0="uint(1)")
+    chk("+", v0="UInt(1)")
 
     b.x = b.y - b.z
     chk("-")
 
     b.x = -1 - b.z
-    chk("-", v0="sint(-1)")
+    chk("-", v0="SInt(-1)")
 
     b.x = b.y * b.z
     chk("*")
 
     b.x = 10 * b.z
-    chk("*", v0="uint(10)")
+    chk("*", v0="UInt(10)")
 
     b.x = b.y % b.z
     chk("%")
 
     b.x = 11 % b.z
-    chk("%", v0="uint(11)")
+    chk("%", v0="UInt(11)")
 
     b.x = b.y >> b.z
     chk(">>")
 
     b.x = 11 >> b.z
-    chk(">>", v0="uint(11)")
+    chk(">>", v0="UInt(11)")
 
     b.x = b.y << b.z
     chk("<<")
 
     b.x = 3 << b.z
-    chk("<<", v0="uint(3)")
+    chk("<<", v0="UInt(3)")
 
     b.x = b.y | b.z
     chk("|")
 
     b.x = 0x7 | b.z
-    chk("|", v0="uint(7)")
+    chk("|", v0="UInt(7)")
 
     b.x = b.y & b.z
     chk("&")
 
     b.x = 0x7 & b.z
-    chk("&", v0="uint(7)")
+    chk("&", v0="UInt(7)")
 
     b.x = b.y ^ b.z
     chk("^")
 
     b.x = 0x7 ^ b.z
-    chk("^", v0="uint(7)")
+    chk("^", v0="UInt(7)")
 
     b.x = b.y == b.z
     chk("==")
@@ -146,10 +146,10 @@ def test_op2():
     chk(">")
 
     b.x = b.y > 1
-    chk(">", v1="uint(1)")
+    chk(">", v1="UInt(1)")
 
     b.x = b.y > -10
-    chk(">", v1="sint(-10)")
+    chk(">", v1="SInt(-10)")
 
     b.x = b.y >= b.z
     chk(">=")

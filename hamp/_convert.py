@@ -114,6 +114,9 @@ def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
     var = func.__code__.co_varnames[0]
     dtree = _replace(tree, var, module)
     srccode = ast.unparse(dtree)
+    # Remove @xx.code decorator:
+    start = srccode.find("def ")
+    srccode = srccode[start:]
     syms: Dict[str, Any] = {}
     exec(srccode, syms)
     return syms[func.__name__], srccode
