@@ -168,11 +168,6 @@ class _VarBuilder:
 def _value_str(value: ExprType) -> ExprRType:
     if isinstance(value, _VarBuilder):
         return value.name
-    if isinstance(value, int):
-        if value >= 0:
-            return f"UInt({value})"
-        else:
-            return f"SInt({value})"
     return value
 
 
@@ -231,7 +226,7 @@ class _CodeBuilder:
 
     @contextmanager
     def if_stmt(self, expr):
-        self.code.append(("when", expr))
+        self.code.append(("when", _value_str(expr)))
         try:
             yield None
         finally:
@@ -240,7 +235,7 @@ class _CodeBuilder:
     @contextmanager
     def elif_stmt(self, expr):
         assert self.code[-1] == ("end_when",)
-        self.code[-1] = ("else_when", expr)
+        self.code[-1] = ("else_when", _value_str(expr))
         try:
             yield None
         finally:
