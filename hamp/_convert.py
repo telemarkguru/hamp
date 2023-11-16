@@ -48,7 +48,7 @@ class _Replacer(ast.NodeTransformer):
 
     def visit_If(self, node):
         self.hw_types = 0
-        self.generic_visit(node.test)
+        self.visit(node.test)
         hw_expr = self.hw_types > 0
         self.generic_visit(node)
         if hw_expr:
