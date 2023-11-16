@@ -43,26 +43,29 @@ def _genfunc(*types):
 
 
 @_genfunc(m._Port)
-def _port(p: m._Port, name: str) -> str:
-    return f"{p.direction.name} {name} : {p.type.firrtl()}"
+def _port(p: m._Port) -> str:
+    return f"{p.direction.name} {p.name} : {p.type.firrtl()}"
 
 
 @_genfunc(m._Wire)
-def _wire(w: m._Wire, name: str) -> str:
-    return f"wire {name} : {w.type.firrtl()}"
+def _wire(w: m._Wire) -> str:
+    return f"wire {w.name} : {w.type.firrtl()}"
 
 
 @_genfunc(m._Register)
-def _register(r: m._Register, name: str) -> str:
+def _register(r: m._Register) -> str:
     if r.reset:
-        return f"regreset {name} : {r.type}, {r.clock}, {r.reset}, {r.value}"
+        return (
+            f"regreset {r.name} : {r.type.firrtl()}, {r.clock.name}, "
+            f"{r.reset.name}, {r.value}"
+        )
     else:
-        return f"reg {name} : {r.type}, {r.clock}"
+        return f"reg {r.name} : {r.type.firrtl()}, {r.clock.name}"
 
 
 @_genfunc(m._Instance)
-def _instance(m: m._Instance, name: str) -> str:
-    return f"inst {name} of {m.module}"
+def _instance(m: m._Instance) -> str:
+    return f"inst {m.name} of {m.module}"
 
 
 def _preamble(version: str = "1.1.0") -> str:
@@ -88,9 +91,7 @@ def _module(module: m._Module, prefix: str = "") -> str:
 
 def _items(module: m._Module, *types) -> str:
     """Generate code for item"""
-    return "\n    ".join(
-        x._firrtl_code(n) for n, x in module._iter_types(*types)
-    )
+    return "\n    ".join(x._firrtl_code() for x in module._iter_types(*types))
 
 
 def _statements(module: m._Module) -> str:

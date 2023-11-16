@@ -20,6 +20,8 @@ modules: Dict[str, "_Module"] = {}
 class _ModuleMember:
     """Base class for module members (ports, wires, state, code)"""
 
+    name: str
+
     def clone(self) -> "_ModuleMember":
         return deepcopy(self)
 
@@ -79,6 +81,7 @@ class _Module:
         if name in self._members:
             raise KeyError(f"{name} already defined in module {self.name}")
         self._members[name] = value
+        value.name = name
         if isinstance(value, _Register):
             if value.clock is None:
                 value.clock = self._find_clock()
@@ -105,7 +108,8 @@ class _Module:
 
     def __iter__(self) -> Iterator[_ModuleMember]:
         """Iterate over module members"""
-        return iter(self._members)
+        for m in self._members.values():
+            yield m
 
     def __contains__(self, name: str) -> bool:
         """Return True if the module has a member with the given name, and
@@ -113,10 +117,9 @@ class _Module:
         return name in self._members
 
     def _iter_types(self, *types) -> Iterator[_ModuleMember]:
-        for name in self:
-            m = self[name]
+        for m in self:
             if isinstance(m, types):
-                yield name, m
+                yield m
 
     def attr(self, name) -> Any:
         """Return an value of attribute with the given name"""
@@ -251,6 +254,7 @@ class _ModuleCode(_CodeItem):
 
     def __init__(self, function: Callable[[_Instance], None]):
         self.function = function
+        self.converted = False
 
 
 class _ModuleFunc(_CodeItem):
@@ -258,6 +262,11 @@ class _ModuleFunc(_CodeItem):
 
     def __init__(self, function: Callable):
         self.function = function
+        self.converted = False
+
+    def __call__(self, *args, **kwargs):
+        assert self.converted
+        self.function(*args, **kwargs)
 
 
 class _Attribute(_ModuleMember):

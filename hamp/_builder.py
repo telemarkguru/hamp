@@ -221,8 +221,11 @@ class _CodeBuilder:
     def __getattr__(self, name: str) -> _VarBuilder:
         assert name in self.module
         item = self.module[name]
-        assert isinstance(item, _module._DataMember)
-        return _VarBuilder(self, name, item.type)
+        if isinstance(item, _module._DataMember):
+            return _VarBuilder(self, name, item.type)
+        if isinstance(item, _module._ModuleFunc):
+            return self.module[name]
+        assert False
 
     @contextmanager
     def if_stmt(self, expr):

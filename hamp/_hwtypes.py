@@ -12,17 +12,27 @@ class _HWType:
         """Create array type"""
         return _Array(self, size)
 
+    def firrtl(self) -> str:
+        assert False
+        return ""
+
 
 class _Clock(_HWType):
     """Clock signal"""
 
     type = "clock"
 
+    def firrtl(self) -> str:
+        return "Clock"
+
 
 class _Reset(_HWType):
     """Generic reset signal"""
 
     type = "reset"
+
+    def firrtl(self) -> str:
+        return "Reset"
 
 
 class _AsyncReset(_Reset):
@@ -59,6 +69,7 @@ class _Int(_HWType):
     """Integer type base class"""
 
     type: str
+    firrtl_type: str
     _minval: Union[int, None]
     _maxval: Union[int, None]
     _set_min_max: Callable[[int], None]

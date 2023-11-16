@@ -26,7 +26,7 @@ def test_member_access_module():
     m = mod.module("foo")
     m.x = mod.input(sint[1])
     m["y"] = mod.output(uint[10])
-    assert [x for x in m] == ["x", "y"]
+    assert [x.name for x in m] == ["x", "y"]
     assert m["x"].type == sint[1]
     assert m.y.type == uint[10]
     assert "x" in m

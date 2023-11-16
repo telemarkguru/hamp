@@ -45,3 +45,49 @@ def test_simple():
     """
         ).lstrip()
     )
+
+
+def test_counter():
+    modules.clear()
+    u1 = uint[1]
+    w = 10
+
+    m = module("test")
+    m.clk = input(clock())
+    m.rst = input(reset())
+    m.en = input(u1)
+    m.out = output(uint[w])
+    m.cnt = register(uint[w], m.clk, m.rst)
+
+    @m.function
+    def inc(x, delta=1):
+        x.cnt = x.cnt + delta
+
+    @m.code
+    def main(x):
+        if x.en:
+            x.inc(x, 3)
+        x.out = x.cnt
+
+    code = generate(m)
+    assert (
+        code
+        == dedent(
+            """
+        FIRRTL version 1.1.0
+        circuit :
+
+          public module test :
+            input clk : Clock
+            input rst : Reset
+            input en : UInt<1>
+            output out : UInt<10>
+
+            regreset cnt : UInt<10>, clk, rst, 0
+
+            when en :
+                connect cnt, add(cnt, UInt(3))
+            connect out, cnt
+    """
+        ).lstrip()
+    )
