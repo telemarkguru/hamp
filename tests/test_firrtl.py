@@ -28,9 +28,9 @@ def test_simple():
         == dedent(
             """
         FIRRTL version 1.1.0
-        circuit :
+        circuit test :
 
-          public module test :
+          module test :
             input x : UInt<1>
             input en : UInt<1>
             output y : SInt<2>
@@ -38,10 +38,10 @@ def test_simple():
             wire w : UInt<3>
 
             when en :
-                connect w, add(x, UInt(1))
+                w <= add(x, UInt(1))
             else :
-                connect w, sub(x, UInt(1))
-            connect y, add(w, UInt(1))
+                w <= sub(x, UInt(1))
+            y <= add(w, UInt(1))
     """
         ).lstrip()
     )
@@ -70,24 +70,26 @@ def test_counter():
         x.out = x.cnt
 
     code = generate(m)
+    with open("test.firrtl", "w") as fh:
+        print(code, file=fh)
     assert (
         code
         == dedent(
             """
         FIRRTL version 1.1.0
-        circuit :
+        circuit test :
 
-          public module test :
+          module test :
             input clk : Clock
             input rst : Reset
             input en : UInt<1>
             output out : UInt<10>
 
-            regreset cnt : UInt<10>, clk, rst, 0
+            reg cnt : UInt<10>, clk with: (reset => (rst, UInt<10>(0))
 
             when en :
-                connect cnt, add(cnt, UInt(3))
-            connect out, cnt
+                cnt <= add(cnt, UInt(3))
+            out <= cnt
     """
         ).lstrip()
     )

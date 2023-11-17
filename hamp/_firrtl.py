@@ -54,13 +54,12 @@ def _wire(w: m._Wire) -> str:
 
 @_genfunc(m._Register)
 def _register(r: m._Register) -> str:
+    type = r.type.firrtl()
     if r.reset:
-        return (
-            f"regreset {r.name} : {r.type.firrtl()}, {r.clock.name}, "
-            f"{r.reset.name}, {r.value}"
-        )
+        reset = f" with: (reset => ({r.reset.name}, {type}({r.value}))"
     else:
-        return f"reg {r.name} : {r.type.firrtl()}, {r.clock.name}"
+        reset =""
+    return f"reg {r.name} : {type}, {r.clock.name}{reset}"
 
 
 @_genfunc(m._Instance)
@@ -68,9 +67,9 @@ def _instance(m: m._Instance) -> str:
     return f"inst {m.name} of {m.module}"
 
 
-def _preamble(version: str = "1.1.0") -> str:
+def _preamble(name: str, version: str = "1.1.0") -> str:
     """Return FIRRTL header"""
-    return f"FIRRTL version {version}\ncircuit :\n"
+    return f"FIRRTL version {version}\ncircuit {name} :\n"
 
 
 def _module(module: m._Module, prefix: str = "") -> str:
@@ -115,7 +114,7 @@ def _expr(x) -> str:
         return str(x)
     op = x[0]
     if op == "connect":
-        return f"connect {x[1]}, {_expr(x[2])}"
+        return f"{x[1]} <= {_expr(x[2])}"
     elif op == "when":
         return f"when {_expr(x[1])} :"
     elif op == "else":
@@ -136,8 +135,8 @@ def generate(*modules):
     Generate and return FIRRTL code for given modules.
     First module is public, the rest are private
     """
+    name = modules[0].name
     return (
-        _preamble()
-        + _module(modules[0], "public ")
-        + "\n".join((_module(x) for x in modules[1:]))
+        _preamble(name)
+        + "\n".join((_module(x) for x in modules))
     )
