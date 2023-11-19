@@ -12,6 +12,7 @@ def struct(c):
     """
 
     annotations = c.__annotations__
+
     class Struct(c, _Struct):
         __annotations__ = annotations
 
@@ -56,7 +57,6 @@ def member(cls, name: str) -> Union[type, None]:
     """
     if hasattr(cls, "__hamp_struct__"):
         return cls.__annotations__.get(name)
-    return None
 
 
 def hasmember(cls, name: str) -> bool:

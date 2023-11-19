@@ -1,0 +1,3 @@
+[per-file-ignores]
+"hamp/_hwtypes_firrtl.py" = ["F811"]
+

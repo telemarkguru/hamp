@@ -2,7 +2,6 @@
 Convert to FIRRTL
 """
 
-from typing import Dict, Callable
 from . import _module as m
 from ._generate import code
 from ._hwtypes import _IntValue
@@ -60,9 +59,9 @@ def _wire(w: m._Wire) -> str:
 def _register(r: m._Register) -> str:
     type = r.type.firrtl()
     if r.reset:
-        reset = f" with: (reset => ({r.reset.name}, {type}({r.value}))"
+        reset = f" with: (reset => ({r.reset.name}, {type}({r.value})))"
     else:
-        reset =""
+        reset = ""
     return f"reg {r.name} : {type}, {r.clock.name}{reset}"
 
 
@@ -99,7 +98,6 @@ def _items(module: m._Module, *types) -> str:
 
 def _statements(module: m._Module) -> str:
     cb = code(module)
-    indent = 0
     lines = [(indent, _expr(x)) for x, indent in cb.iter_with_indent()]
     return "\n    ".join(
         f"{' ' * (indent*4)}{expr}" for indent, expr in lines if expr
@@ -140,7 +138,4 @@ def generate(*modules):
     First module is public, the rest are private
     """
     name = modules[0].name
-    return (
-        _preamble(name)
-        + "\n".join((_module(x) for x in modules))
-    )
+    return _preamble(name) + "\n".join((_module(x) for x in modules))

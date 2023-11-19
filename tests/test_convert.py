@@ -11,14 +11,14 @@ def test_if():
     m.b = wire(uint[2])
     p = 2
 
-    def foo(x):
+    def foo(x):  # pragma: no cover
         if p + 1:
             if x.a > x.b:
-                z.a.b = 3
+                z.a.b = 3  # noqa: F821
             elif x.a < x.b:
-                z = 4
+                z = 4  # noqa: F841
             else:
-                z = 5
+                z = 5  # noqa: F841
 
     f, txt = convert(foo, m)
     assert (
@@ -45,10 +45,10 @@ def test_and_or_not():
     m.b = input(uint[2])
     m.c = input(reset())
 
-    def foo(x):
-        if x.a and b:
+    def foo(x):  # pragma: no cover
+        if x.a and b:  # noqa: F821
             z = 1
-        if a or x.b:
+        if a or x.b:  # noqa: F821
             z += 2
         if not x.c:
             z += ~3
