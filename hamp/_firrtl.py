@@ -6,6 +6,10 @@ from typing import Dict, Callable
 from . import _module as m
 from ._generate import code
 from ._hwtypes import _IntValue
+from ._hwtypes_firrtl import apply
+
+
+apply()
 
 
 def _d_if_not_int(x):

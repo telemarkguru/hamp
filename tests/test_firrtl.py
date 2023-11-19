@@ -1,6 +1,7 @@
 from hamp._firrtl import generate
 from hamp._module import module, input, output, wire, register, modules
-from hamp._hwtypes import uint, sint, clock, reset
+from hamp._hwtypes import uint, sint, clock, reset, async_reset, sync_reset
+from hamp._struct import struct, flip
 from textwrap import dedent
 
 
@@ -54,7 +55,7 @@ def test_counter():
 
     m = module("test")
     m.clk = input(clock())
-    m.rst = input(reset())
+    m.rst = input(async_reset())
     m.en = input(u1)
     m.out = output(uint[w])
     m.cnt = register(uint[w], m.clk, m.rst)
@@ -81,7 +82,7 @@ def test_counter():
 
           module test :
             input clk : Clock
-            input rst : Reset
+            input rst : AsyncReset
             input en : UInt<1>
             output out : UInt<10>
 
@@ -90,6 +91,58 @@ def test_counter():
             when en :
                 cnt <= add(cnt, UInt(3))
             out <= cnt
+    """
+        ).lstrip()
+    )
+
+
+def test_struct():
+    modules.clear()
+    u1 = uint[1]
+
+    @struct
+    class Data:
+        x: uint[12]
+        y: sint[12]
+
+    @struct
+    class Foo:
+        valid: u1
+        ready: flip(u1)
+        data: Data
+
+    m = module("struct")
+    m.clk = input(clock())
+    m.din = input(Foo)
+    m.dout = output(Foo)
+    m.x = register(Data, m.clk, False)
+
+    @m.code
+    def main(x):
+        x.x = x.din.data
+        x.dout.data = x.x
+        x.dout.valid = x.din.valid
+        x.din.ready = x.dout.ready
+
+    code = generate(m)
+    assert (
+        code
+        == dedent(
+            """
+        FIRRTL version 1.1.0
+        circuit struct :
+
+          module struct :
+            input clk : Clock
+            input din : {valid: UInt<1>, flip ready: UInt<1>, data: {x: UInt<12>, y: SInt<12>}}
+            output dout : {valid: UInt<1>, flip ready: UInt<1>, data: {x: UInt<12>, y: SInt<12>}}
+
+            reg x : {x: UInt<12>, y: SInt<12>}, clk
+
+            x <= din.data
+            dout.data <= x
+            dout.valid <= din.valid
+            din.ready <= dout.ready
     """
         ).lstrip()
     )

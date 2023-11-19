@@ -114,7 +114,7 @@ def test_module_register_no_reset():
     mod.modules.clear()
     m = mod.module("foo")
     m.clk = mod.input(clock())
-    with pytest.raises(ValueError, match="No clock defined in module foo"):
+    with pytest.raises(ValueError, match="No reset defined in module foo"):
         m.x = mod.register(uint[2])
 
 

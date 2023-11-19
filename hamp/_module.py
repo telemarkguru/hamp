@@ -148,7 +148,7 @@ class _Module:
             m = self._members[name]
             if _is_reset_input(m):
                 return m
-        raise ValueError(f"No clock defined in module {self.name}")
+        raise ValueError(f"No reset defined in module {self.name}")
 
     def code(self, function: Callable[["_Instance"], None]) -> None:
         """Decorator for adding code to this module, like so:

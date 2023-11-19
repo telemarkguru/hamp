@@ -1,7 +1,7 @@
 """Composit data types"""
 
 from dataclasses import dataclass, field
-from ._hwtypes import _Int
+from ._hwtypes import _Int, _Struct
 from typing import Union
 
 
@@ -10,13 +10,20 @@ def struct(c):
     It preprocesses the class members and then
     calls dataclass to generate a dataclass Python class
     """
+
     annotations = c.__annotations__
+    class Struct(c, _Struct):
+        __annotations__ = annotations
+
+    c = Struct
+
     c.__flips__ = set()
     for a in annotations:
         t = annotations[a]
         if isinstance(t, tuple):
             t, _ = t
             c.__flips__.add(a)
+            annotations[a] = t
         if isinstance(t, _Int):
             if not hasattr(c, a):
                 setattr(c, a, t(0))

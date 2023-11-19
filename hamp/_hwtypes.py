@@ -12,27 +12,17 @@ class _HWType:
         """Create array type"""
         return _Array(self, size)
 
-    def firrtl(self) -> str:
-        assert False
-        return ""
-
 
 class _Clock(_HWType):
     """Clock signal"""
 
     type = "clock"
 
-    def firrtl(self) -> str:
-        return "Clock"
-
 
 class _Reset(_HWType):
     """Generic reset signal"""
 
     type = "reset"
-
-    def firrtl(self) -> str:
-        return "Reset"
 
 
 class _AsyncReset(_Reset):
@@ -60,16 +50,11 @@ class _IntValue:
     def __repr__(self):
         return f"{self.type.type}[{self.type.size}]({self.value:#x})"
 
-    def firrtl(self) -> str:
-        """Return FIRRTL syntax"""
-        return f"{self.type.firrtl()}({self.value:#x})"
-
 
 class _Int(_HWType):
     """Integer type base class"""
 
     type: str
-    firrtl_type: str
     _minval: Union[int, None]
     _maxval: Union[int, None]
     _set_min_max: Callable[[int], None]
@@ -88,16 +73,11 @@ class _Int(_HWType):
     def __repr__(self):
         return f"{self.type}[{self.size}]"
 
-    def firrtl(self) -> str:
-        """Return FIRRTL syntax"""
-        return f"{self.firrtl_type}<{self.size}>"
-
 
 class _UInt(_Int):
     """Unsigned integer"""
 
     type = "uint"
-    firrtl_type = "UInt"
 
     def _set_min_max(self, size):
         self._minval = 0
@@ -111,7 +91,6 @@ class _SInt(_Int):
     """Signed integer"""
 
     type = "sint"
-    firrtl_type = "SInt"
 
     def _set_min_max(self, size):
         if size > 0:
@@ -128,9 +107,6 @@ class _Array(_HWType):
 
     def __repr__(self):
         return f"{repr(self.type)}[{self.size}]"
-
-    def firrtl(self):
-        return f"{self.type.firrtl()}[{self.size}]"
 
 
 class _IntFactory:
