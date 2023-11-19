@@ -108,6 +108,22 @@ class _Array(_HWType):
     def __repr__(self):
         return f"{repr(self.type)}[{self.size}]"
 
+    def __call__(self):
+        return _ArrayValue(self)
+
+
+class _ArrayValue:
+
+    def __init__(self, type):
+        self.type = type
+        self.values = [type.type() for _ in range(type.size)]
+
+    def __getitem__(self, i):
+        return self.values[i]
+
+    def __setitem__(self, i, v):
+        self.values[i] = self.type.type(v)
+
 
 class _IntFactory:
     """Creates intger types"""

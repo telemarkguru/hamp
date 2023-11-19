@@ -69,7 +69,7 @@ def test_struct():
     @struct
     class Data:
         x: uint[12]
-        y: sint[12]
+        y: sint[12][3]
 
     @struct
     class Foo:
@@ -91,3 +91,25 @@ def test_struct():
         x.din.ready = x.dout.ready
 
     _generate_and_check(m, "struct")
+
+
+def test_ops():
+    modules.clear()
+
+    m = module("ops")
+    m.a = input(uint[8])
+    m.b = input(uint[8])
+    m.c = input(sint[8])
+    m.d = input(sint[8])
+    m.x = output(uint[9][2])
+    m.y = output(sint[9][2])
+
+    @m.code
+    def main(x):
+        x.x[0] = x.a >> x.b
+        x.x[1] = x.a << x.b
+        x.y[0] = x.c >> x.b
+        x.y[1] = x.c << x.b
+
+
+    _generate_and_check(m, "ops")

@@ -59,3 +59,21 @@ def test_type_error():
             a: sint[1]
             b: int
             c: uint[7]
+
+
+def test_array_in_struct():
+    @struct
+    class Foo:
+        a: sint[1]
+        b: uint[2][3]
+
+    x = Foo()
+    assert x.b[1].value == 0
+    x.b[0] = 1
+    x.b[1] = 2
+    x.b[2] = 3
+    assert x.b[0].value == 1
+    assert x.b[1].value == 2
+    assert x.b[2].value == 3
+
+

@@ -1,7 +1,7 @@
 """Composit data types"""
 
 from dataclasses import dataclass, field
-from ._hwtypes import _Int, _Struct
+from ._hwtypes import _Int, _Struct, _Array
 from typing import Union
 
 
@@ -29,6 +29,9 @@ def struct(c):
             if not hasattr(c, a):
                 setattr(c, a, t(0))
         elif hasattr(t, "__hamp_struct__"):
+            if not hasattr(c, a):
+                setattr(c, a, field(default_factory=t))
+        elif isinstance(t, _Array):
             if not hasattr(c, a):
                 setattr(c, a, field(default_factory=t))
         else:
