@@ -108,6 +108,7 @@ def _cell_contentes(cell):
     except:
         return None
 
+
 def _closure_locals(func: Callable) -> Dict[str, Any]:
     """Extract function closure variables"""
     if c := func.__closure__:
