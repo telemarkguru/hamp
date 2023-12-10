@@ -105,7 +105,7 @@ def _replace(tree: ast.AST, var: str, module: _Module):
 def _cell_contentes(cell):
     try:
         return cell.cell_contents
-    except:
+    except ValueError:
         return None
 
 
