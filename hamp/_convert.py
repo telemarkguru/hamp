@@ -102,6 +102,22 @@ def _replace(tree: ast.AST, var: str, module: _Module):
     return tree
 
 
+def _cell_contentes(cell):
+    try:
+        return cell.cell_contents
+    except:
+        return None
+
+def _closure_locals(func: Callable) -> Dict[str, Any]:
+    """Extract function closure variables"""
+    if c := func.__closure__:
+        return {
+            var: _cell_contentes(cell)
+            for var, cell in zip(func.__code__.co_freevars, c)
+        }
+    return {}
+
+
 def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
     """Convert function to code generator, and return converted function
 
@@ -117,6 +133,6 @@ def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
     # Remove @xx.code decorator:
     start = srccode.find("def ")
     srccode = srccode[start:]
-    syms: Dict[str, Any] = {}
+    syms: Dict[str, Any] = {**func.__globals__, **_closure_locals(func)}
     exec(srccode, syms)
     return syms[func.__name__], srccode

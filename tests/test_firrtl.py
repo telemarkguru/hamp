@@ -49,6 +49,9 @@ def test_counter():
     m.out = output(uint[w])
     m.cnt = register(uint[w], m.clk, m.rst)
 
+    def add2(x):
+        return x + 2
+
     @m.function
     def inc(x, delta=1):  # pragma: no cover
         x.cnt = x.cnt + delta
@@ -56,7 +59,7 @@ def test_counter():
     @m.code
     def main(x):  # pragma: no cover
         if x.en:
-            x.inc(x, 3)
+            x.inc(x, add2(1))
         x.out = x.cnt
 
     _generate_and_check(m, "counter")

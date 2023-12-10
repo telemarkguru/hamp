@@ -4,6 +4,34 @@ from hamp._hwtypes import clock, reset, uint
 from textwrap import dedent
 
 
+def test_closure():
+    modules.clear()
+    m = module("closure")
+
+    a = 3
+
+    def xyz(p):
+        return p + a
+
+    def fx(x):
+        z = xyz(3) + xyz(4)
+        return z
+
+    f, txt = convert(fx, m)
+
+    assert f(0) == 13
+    assert (
+        txt
+        == dedent(
+            """
+            def fx(x):
+                z = xyz(3) + xyz(4)
+                return z
+            """
+        ).strip()
+    )
+
+
 def test_if():
     modules.clear()
     m = module("test")
