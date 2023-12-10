@@ -4,7 +4,7 @@ Convert to FIRRTL
 
 from . import _module as m
 from ._generate import code
-from ._hwtypes import _IntValue
+from ._hwtypes import _IntValue, _Reset, _Clock
 from ._hwtypes_firrtl import apply
 
 
@@ -58,10 +58,13 @@ def _wire(w: m._Wire) -> str:
 @_genfunc(m._Register)
 def _register(r: m._Register) -> str:
     type = r.type.firrtl()
-    if r.reset:
+    if isinstance(r.reset, m._DataMember):
+        assert isinstance(r.reset.type, _Reset)
         reset = f" with: (reset => ({r.reset.name}, {type}({r.value})))"
     else:
         reset = ""
+    assert isinstance(r.clock, m._DataMember)
+    assert isinstance(r.clock.type, _Clock)
     return f"reg {r.name} : {type}, {r.clock.name}{reset}"
 
 

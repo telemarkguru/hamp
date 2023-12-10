@@ -116,5 +116,4 @@ def test_ops():
         x.y[0] = x.c >> x.b
         x.y[1] = x.c << x.b
 
-
     _generate_and_check(m, "ops")

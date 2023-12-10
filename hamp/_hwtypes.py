@@ -8,6 +8,8 @@ from typing import Dict, Union, Callable
 class _HWType:
     """Base class for all hardware modelling types"""
 
+    firrtl: Callable[[], str]
+
     def __getitem__(self, size: int) -> "_Array":
         """Create array type"""
         return _Array(self, size)
@@ -39,6 +41,8 @@ class _SyncReset(_Reset):
 
 class _IntValue:
     """Integer value"""
+
+    firrtl: Callable[[], str]
 
     def __init__(self, value, type):
         self.value = value
@@ -101,7 +105,7 @@ class _SInt(_Int):
 
 
 class _Array(_HWType):
-    def __init__(self, type: _HWType, size: int):
+    def __init__(self, type, size: int):
         self.type = type
         self.size = size
 
@@ -113,7 +117,6 @@ class _Array(_HWType):
 
 
 class _ArrayValue:
-
     def __init__(self, type):
         self.type = type
         self.values = [type.type() for _ in range(type.size)]

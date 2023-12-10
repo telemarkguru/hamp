@@ -218,7 +218,9 @@ class _CodeBuilder:
             text.append(f"{' ' * (indent*4)}{c}")
         return "\n".join(text)
 
-    def __getattr__(self, name: str) -> _VarBuilder:
+    def __getattr__(
+        self, name: str
+    ) -> Union[_VarBuilder, _module._ModuleMember, bool]:
         assert name in self.module
         item = self.module[name]
         if isinstance(item, _module._DataMember):

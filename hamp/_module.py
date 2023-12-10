@@ -2,7 +2,7 @@
 Code for the module class and associated features.
 """
 
-from typing import Callable, Union, Any, Dict, Iterator
+from typing import Callable, Union, Any, Dict, Iterator, TypeVar, Type
 from ._hwtypes import (
     _HWType,
     _Clock,
@@ -116,9 +116,11 @@ class _Module:
         False if not"""
         return name in self._members
 
-    def _iter_types(self, *types) -> Iterator[_ModuleMember]:
+    IT = TypeVar("IT")
+
+    def _iter_types(self, type: Type[IT]) -> Iterator[IT]:
         for m in self:
-            if isinstance(m, types):
+            if isinstance(m, type):
                 yield m
 
     def attr(self, name) -> Any:
@@ -213,8 +215,8 @@ class _Register(_LocalDataMember):
     def __init__(
         self,
         type: _HWType,
-        clock: Union[_Clock, None],
-        reset: Union[_Reset, None, bool],
+        clock: Union[_DataMember, None],
+        reset: Union[_DataMember, None, bool],
         value: Union[int, _HWType],
     ):
         self.type = type
@@ -246,7 +248,8 @@ class _Instance(_LocalDataMember):
 
 
 class _CodeItem(_ModuleMember):
-    pass
+    function: Callable[[_Instance], None]
+    converted: bool
 
 
 class _ModuleCode(_CodeItem):
@@ -299,8 +302,8 @@ def wire(type: _HWType) -> _Wire:
 
 def register(
     type: _HWType,
-    clock: Union[_Clock, None] = None,
-    reset: Union[_Reset, None, bool] = None,
+    clock: Union[_DataMember, None] = None,
+    reset: Union[_DataMember, None, bool] = None,
     value: Union[int, _HWType] = 0,
 ) -> _Register:
     """Create register module member of the given type.

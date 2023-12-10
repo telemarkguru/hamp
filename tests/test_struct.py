@@ -75,5 +75,3 @@ def test_array_in_struct():
     assert x.b[0].value == 1
     assert x.b[1].value == 2
     assert x.b[2].value == 3
-
-

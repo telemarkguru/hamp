@@ -11,17 +11,17 @@ def code(m: _Module) -> _CodeBuilder:
     """Generate code for module"""
     cb = _CodeBuilder(m)
 
-    for c in m._iter_types(_ModuleFunc):
-        if not c.converted:
-            f, txt = convert(c.function, m)
-            c.function = f
-            c.converted = True
-    for c in m._iter_types(_ModuleCode):
-        if not c.converted:
-            f, txt = convert(c.function, m)
-            c.function = f
-            c.converted = True
+    for cf in m._iter_types(_ModuleFunc):
+        if not cf.converted:
+            f, txt = convert(cf.function, m)
+            cf.function = f
+            cf.converted = True
+    for cc in m._iter_types(_ModuleCode):
+        if not cc.converted:
+            f, txt = convert(cc.function, m)
+            cc.function = f
+            cc.converted = True
         else:
-            f = c.function
+            f = cc.function
         f(cb)
     return cb
