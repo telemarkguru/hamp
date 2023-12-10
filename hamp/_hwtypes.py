@@ -159,6 +159,10 @@ class _Struct(_HWType):
 
     type = "Struct"
 
+    def __class_getitem__(cls, size: int) -> "_Array":
+        """Create array type"""
+        return _Array(cls, size)
+
 
 class _Direction:
     """Port direction"""

@@ -76,17 +76,22 @@ def test_struct():
         valid: u1
         ready: flip(u1)
         data: Data
+        data2: Data[3]
 
     m = module("struct")
     m.clk = input(clock())
     m.din = input(Foo)
     m.dout = output(Foo)
+    m.sel = input(uint[2])
     m.x = register(Data, m.clk, False)
+    m.y = register(Data[3], m.clk, False)
 
     @m.code
     def main(x):  # pragma: no cover
         x.x = x.din.data
+        x.y[x.sel] = x.din.data
         x.dout.data = x.x
+        x.dout.data2 = x.y
         x.dout.valid = x.din.valid
         x.din.ready = x.dout.ready
 
@@ -105,7 +110,7 @@ def test_ops():
     m.y = output(sint[9][2])
 
     @m.code
-    def main(x):
+    def main(x):  # pragma: no cover
         x.x[0] = x.a >> x.b
         x.x[1] = x.a << x.b
         x.y[0] = x.c >> x.b
