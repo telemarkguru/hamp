@@ -222,8 +222,8 @@ def test_array_indexing():
     with raises(IndexError, match=r"s\[21\] is out of range \(size=20\)"):
         b.y = b.s[21]
 
-    with raises(TypeError, match=r"x is not an array"):
-        b.y = b.x[2]
+    with raises(TypeError, match=r"b is not an array"):
+        b.y = b.b[2]
 
 
 def test_struct_member_access():

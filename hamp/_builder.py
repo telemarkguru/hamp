@@ -67,6 +67,8 @@ class _VarBuilder:
         if isinstance(idx, slice):
             self._chk_slice(idx)
             return ("bits", self.name, idx.start, idx.stop)
+        elif isinstance(self.item, _hwtypes._Int):
+            return self[idx:idx]
         idx = self._chk_idx(idx)
         return _VarBuilder(self.builder, f"{self.name}[{idx}]", self.item.type)
 
