@@ -1,8 +1,8 @@
 """Composit data types"""
 
-from dataclasses import dataclass, field
-from ._hwtypes import _Int, _Struct, _Array
-from typing import Union
+from dataclasses import dataclass, field, fields
+from ._hwtypes import _Int, _Struct, _Array, _HWType
+from typing import Union, Iterator, Tuple
 
 
 def struct(c):
@@ -68,3 +68,11 @@ def hasmember(cls, name: str) -> bool:
     Return False if not.
     """
     return member(cls, name) is not None
+
+
+def members(cls) -> Iterator[Tuple[str, _HWType]]:
+    """Iterator over hardware type members, yield tuples with (name, type)"""
+    for f in fields(cls):
+        t = f.type
+        if isinstance(t, _HWType):
+            yield f.name, t

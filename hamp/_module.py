@@ -96,7 +96,10 @@ class _Module:
 
     def __getattr__(self, name: str) -> _ModuleMember:
         """Return member of this module"""
-        return self._members[name]
+        try:
+            return self._members[name]
+        except KeyError as ke:
+            raise AttributeError(str(ke))
 
     def __setitem__(self, name: str, value: _ModuleMember) -> None:
         """Add member to this module"""
@@ -236,6 +239,7 @@ class _Instance(_LocalDataMember):
     def __init__(self, module: _Module):
         self.module = module
         self.name = ""
+        self.type = module
 
     def __getattr__(self, name) -> "_Port":
         """Return module port"""

@@ -31,7 +31,7 @@ def test_member_access_module():
     assert m.y.type == uint[10]
     assert "x" in m
     del m["x"]
-    with pytest.raises(KeyError):
+    with pytest.raises(AttributeError):
         m.x
     assert "x" not in m
 

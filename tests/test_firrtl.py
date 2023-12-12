@@ -9,8 +9,8 @@ from os.path import dirname, abspath
 _this = dirname(abspath(__file__))
 
 
-def _generate_and_check(m, name):
-    code = generate(m)
+def _generate_and_check(name, *m):
+    code = generate(*m)
     with open(f"{_this}/{name}.fir", "w") as fh:
         fh.write(code)
     with open(f"{_this}/{name}_exp.fir") as fh:
@@ -35,7 +35,7 @@ def test_simple():
             b.w = b.x - 1
         b.y = b.w + 1
 
-    _generate_and_check(m, "simple")
+    _generate_and_check("simple", m)
 
 
 def test_counter():
@@ -63,7 +63,7 @@ def test_counter():
             x.inc(x, add2(1))
         x.out = x.cnt
 
-    _generate_and_check(m, "counter")
+    _generate_and_check("counter", m)
 
 
 def test_struct():
@@ -99,7 +99,7 @@ def test_struct():
         x.dout.valid = x.din.valid
         x.din.ready = x.dout.ready
 
-    _generate_and_check(m, "struct")
+    _generate_and_check("struct", m)
 
 
 def test_ops():
@@ -120,7 +120,7 @@ def test_ops():
         x.y[0] = x.c >> x.b
         x.y[1] = x.c << x.b
 
-    _generate_and_check(m, "ops")
+    _generate_and_check("ops", m)
 
 
 def test_index():
@@ -137,4 +137,76 @@ def test_index():
     def main(x):  # pragma: no cover
         x.z = cat(x.a[x.x][x.y], x.b)
 
-    _generate_and_check(m, "index")
+    _generate_and_check("index", m)
+
+
+def test_instantiation():
+    modules.clear()
+
+    @struct
+    class Data:
+        x: uint[2]
+        y: sint[3]
+
+    m = module("mux")
+    m.a = input(Data)
+    m.b = input(Data)
+    m.x = output(Data)
+    m.sel = input(uint[1])
+
+    @m.code
+    def main(m):  # pragma: no cover
+        if m.sel:
+            m.x = m.b
+        else:
+            m.x = m.a
+
+    mux = m
+
+    m = module("mux4")
+    m.a = input(Data[4])
+    m.x = output(Data)
+    m.sel = input(uint[2])
+
+    m.m1 = mux()
+    m.m2 = mux()
+    m.m3 = mux()
+
+    @m.code
+    def main2(m):  # pragma: no cover
+        m.m1.a = m.a[0]
+        m.m1.b = m.a[1]
+        m.m1.sel = m.sel[0]
+        m.m2.a = m.a[2]
+        m.m2.b = m.a[3]
+        m.m2.sel = m.sel[0]
+        m.m3.a = m.m1.x
+        m.m3.b = m.m2.x
+        m.m3.sel = m.sel[1]
+        m.x = m.m3.x
+
+    _generate_and_check("mux4", m, mux)
+
+
+def test_logic_expr():
+    modules.clear()
+
+    m = module("logexp")
+    m.a = input(uint[3])
+    m.b = input(sint[4])
+    m.c = input(uint[1])
+    m.x = output(uint[1])
+    m.y = output(uint[3])
+
+    @m.code
+    def main(m):
+        m.x = m.a and m.b and m.c
+        m.y = 0
+        if not m.a:
+            m.y = 1
+        elif m.a or m.c:
+            m.y = 2
+        elif m.b:
+            m.y = 3
+
+    _generate_and_check("logexp", m)

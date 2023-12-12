@@ -15,24 +15,46 @@ def _d_if_not_int(x):
     return "d" if not isinstance(x, int) else ""
 
 
+def _op1(name, argc=1, parc=0):
+    return (f"{name}({{e[0]}})", argc, parc)
+
+
+def _op2(name, argc=2, parc=0):
+    return (f"{name}({{e[0]}}, {{e[1]}})", argc, parc)
+
+
+def _op3(name, argc=3, parc=0):
+    return (f"{name}({{e[0]}}, {{e[1]}}, {{e[2]}})", argc, parc)
+
+
 _op_to_func = {
-    "+": "add({e[0]}, {e[1]})",
-    "-": "sub({e[0]}, {e[1]})",
-    "*": "mul({e[0]}, {e[1]})",
-    "%": "rem({e[0]}, {e[1]})",
-    "==": "eq({e[0]}, {e[1]})",
-    "!=": "neq({e[0]}, {e[1]})",
-    ">": "gt({e[0]}, {e[1]})",
-    ">=": "geq({e[0]}, {e[1]})",
-    "<": "lt({e[0]}, {e[1]})",
-    "<=": "leq({e[0]}, {e[1]})",
-    ">>": "{d}shr({e[0]}, {e[1]})",
-    "<<": "{d}shl({e[0]}, {e[1]})",
-    "&": "and({e[0]}, {e[1]})",
-    "|": "or({e[0]}, {e[1]})",
-    "^": "xor({e[0]}, {e[1]})",
-    "~": "not({e[0]})",
-    "cat": "cat({e[0]}, {e[1]})",
+    # op -> opstr, argument count, parameter count
+    "+": _op2("add"),
+    "-": _op2("sub"),
+    "*": _op2("mul"),
+    "%": _op2("rem"),
+    "==": _op2("eq"),
+    "!=": _op2("neq"),
+    ">": _op2("gt"),
+    ">=": _op2("geq"),
+    "<": _op2("lt"),
+    "<=": _op2("leq"),
+    ">>": _op2("dshr"),
+    "<<": _op2("dshl"),
+    ">>k": _op2("shr", 1, 1),
+    "<<k": _op2("shl", 1, 1),
+    "&": _op2("and"),
+    "|": _op2("or"),
+    "^": _op2("xor"),
+    "~": _op1("not"),
+    "and": _op2("and"),
+    "or": _op2("or"),
+    "not": _op1("not"),
+    "andr": _op1("andr"),
+    "orr": _op1("orr"),
+    "xorr": _op1("xorr"),
+    "cat": _op2("cat"),
+    "bits": _op3("bits", 1, 2),
 }
 
 
@@ -71,7 +93,7 @@ def _register(r: m._Register) -> str:
 
 @_genfunc(m._Instance)
 def _instance(m: m._Instance) -> str:
-    return f"inst {m.name} of {m.module}"
+    return f"inst {m.name} of {m.module.name}"
 
 
 def _preamble(name: str, version: str = "1.1.0") -> str:
@@ -108,9 +130,9 @@ def _statements(module: m._Module) -> str:
     )
 
 
-def _expr(x) -> str:
+def _expr(x, signed=False) -> str:
     if isinstance(x, int):
-        if x >= 0:
+        if x >= 0 and not signed:
             return f"UInt({x})"
         else:
             return f"SInt({x})"
@@ -129,10 +151,13 @@ def _expr(x) -> str:
         return f"else when {_expr(x[1])} :"
     elif op == "end_when":
         return ""
+    elif op in ("<<", ">>") and isinstance(x[2], int):
+        opstr, _, _ = _op_to_func[f"{op}k"]
+        return opstr.format(e=[_expr(x[1]), x[2]])
     else:
-        e = [_expr(z) for z in x[1:]]
-        d = "d" if len(e) > 1 and not isinstance(e[1], int) else ""
-        f = _op_to_func[op].format(e=e, d=d)
+        opstr, argc, parc = _op_to_func[op]
+        e = [_expr(z) if i < argc else z for i, z in enumerate(x[1:])]
+        f = opstr.format(e=e)
         return f
 
 
