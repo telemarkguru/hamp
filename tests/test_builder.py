@@ -173,13 +173,21 @@ def test_logop():
     b = _setup()
 
     b.x = b.and_expr(b.y, b.z)
-    assert b.code[-1] == ("connect", "x", ("and", "y", "z"))
+    assert b.code[-1] == (
+        "connect",
+        "x",
+        ("and", ("orr", "y"), ("orr", "z")),
+    )
 
     b.x = b.or_expr(b.y, b.z)
-    assert b.code[-1] == ("connect", "x", ("or", "y", "z"))
+    assert b.code[-1] == (
+        "connect",
+        "x",
+        ("or", ("orr", "y"), ("orr", "z")),
+    )
 
     b.x = b.not_expr(b.y)
-    assert b.code[-1] == ("connect", "x", ("not", "y"))
+    assert b.code[-1] == ("connect", "x", ("not", ("orr", "y")))
 
 
 def test_bit_slicing():

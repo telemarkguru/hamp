@@ -173,6 +173,19 @@ def _value_str(value: ExprType) -> ExprRType:
     return value
 
 
+def _logic_str(value: ExprType) -> ExprRType:
+    if isinstance(value, _VarBuilder):
+        item = value.item
+        if (
+            isinstance(item, _hwtypes._Int)
+            and item.size != 1
+            or isinstance(item, _hwtypes._SInt)
+        ):
+            return ("orr", value.name)
+        return value.name
+    return value
+
+
 # CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]
 CodeListItemType = Tuple[Any, ...]
 
@@ -233,7 +246,7 @@ class _CodeBuilder:
 
     @contextmanager
     def if_stmt(self, expr):
-        self.code.append(("when", _value_str(expr)))
+        self.code.append(("when", _logic_str(expr)))
         try:
             yield None
         finally:
@@ -242,7 +255,7 @@ class _CodeBuilder:
     @contextmanager
     def elif_stmt(self, expr):
         assert self.code[-1] == ("end_when",)
-        self.code[-1] = ("else_when", _value_str(expr))
+        self.code[-1] = ("else_when", _logic_str(expr))
         try:
             yield None
         finally:
@@ -257,11 +270,17 @@ class _CodeBuilder:
         finally:
             self.code.append(("end_when",))
 
+    def _reduce_op(self, name, *ops):
+        if len(ops) == 2:
+            return (name, _logic_str(ops[0]), _logic_str(ops[1]))
+        op, *rops = ops
+        return (name, _logic_str(op), self._reduce_op(name, *rops))
+
     def and_expr(self, *ops):
-        return ("and", *ops)
+        return self._reduce_op("and", *ops)
 
     def or_expr(self, *ops):
-        return ("or", *ops)
+        return self._reduce_op("or", *ops)
 
     def not_expr(self, op):
-        return ("not", op)
+        return ("not", _logic_str(op))
