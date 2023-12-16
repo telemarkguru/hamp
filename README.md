@@ -29,7 +29,11 @@ using meta-programming in Python.  This includes:
 
 - Define RTL composite types (structs and arrays).
 
-A simple example:
+An example implementing a simple FIFO. Clock and reset are not explicitly
+declared (though they can be), but inferred as registers with reset are
+used.  The default clock is named "clk" and the default reset is named
+"rst":
+
 ```Python
 from hamp import module, input, output, wire, register, uint
 
@@ -85,9 +89,61 @@ fifo1.dft = input(dft_type)
 
 ## Data types
 
+### Basic data types
+
+The basic hardware data types are unsigned and signed integers of a specific
+bit width.  These are declared like so:
+
 ```Python
-from hamp import struct
+from hamp import module, uint, sint, u1
+
+m = module("example")
+m.a = input(uint[10])  # a is an 10 bit unsigned integer input
+m.b = output(sint[11])  # b is am 11 bit signed integer output
+m.c = input(u1)  # For convenience, the very common
+                 # 1 bit unsigned type is provided as u1
 ```
+
+### Arrays
+
+Arrays of any type (including arrays) can be defined.  This is done by
+appending "[N]" where N is the size of the array. Example:
+
+```Python
+from hamp import uint
+
+matrix3x5 = uint[8][3][5]  # An 5 elemet array of 3 element arrays of
+                           # 8 bit unsigned integers.
+```
+
+### Composite data types
+
+Composite data types are built on top of Pythons dataclasses, where the
+fields are of basic hardware types, composite data types, or arrays of
+these.  Example:
+
+```Python
+from hamp import struct, uint, sint, u1, flip, module
+
+@struct
+class Payload:
+    x: sint[32]
+    y: sint[32]
+    data: uint[8][16]
+
+@struct
+class ValidReady:
+    valid: u1
+    ready: flip(u1)  # flip() will make ready have the opposite
+                     # direction as the other members when used
+                     # as input or output
+    data: Payload[3]
+
+m = module("foo")
+m.din = input(ValidReady)
+m.dout = output(ValidReady)
+```
+
 
 ## Generating RTL code
 
@@ -110,8 +166,8 @@ with b.else_stmt():
 ```
 
 But as this code may be cumbersome to read and write, function decorators are
-provided that converts plain Python code to the format just described.
-So the previous multiplexer example can also be expressed as:
+provided that converts plain Python code to the format just described.  So that
+the last 5 lines of the previous multiplexer example can be expressed as:
 
 ```Python
 @m.code
@@ -122,14 +178,14 @@ def mux(m):
        m.x = m.a
 ```
 
-The @code decorator translates the if/else statments in the mux function to the
-corresponding with-statement, so that the function can be executed to generate
-RTL.
+The @code decorator translates the if/else statements in the mux function to
+the corresponding with-statement, so that the function can be executed to
+generate RTL.
 
 Apart from if/elif/else statements, *and*, *or* and *not* are translated to
-function calls as these are not overloadable operators in Python.
+function calls as these are not possible to overload in Python.
 
-Functions can also be translated using the @function decorator, like so:
+Functions can be translated using the @function decorator, like so:
 
 ```Python
 @m.function
@@ -151,28 +207,3 @@ def fsm(m):
     ...
 ```
 
-## Function calls
-
-```Python
-from hamp import module, input, output, uint
-
-dt = uint[32]
-stages = 10
-
-m = module("module)
-m.din = input(dt)
-m.dout = output(dt)
-m.data = wire(dt[stages])
-
-@m.function
-def stage(mb, idx: int, value: int):
-    mb.data[idx] = mb.data[idx-1] + value
-
-@m.code
-def main(mb):
-    mb.data[0] = m.din
-    for i in range(mb, 1, size):
-        mb.stage(i, -42)
-    mb.dout = m.data[size-1]
-
-```
