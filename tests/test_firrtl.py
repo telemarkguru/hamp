@@ -1,6 +1,6 @@
 from hamp._firrtl import generate
 from hamp._module import module, input, output, wire, register, modules
-from hamp._hwtypes import uint, sint, clock, async_reset
+from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
 from hamp._stdlib import cat
 from os.path import dirname, abspath
@@ -19,7 +19,6 @@ def _generate_and_check(name, *m):
 
 def test_simple():
     modules.clear()
-    u1 = uint[1]
 
     m = module("test")
     m.x = input(u1)
@@ -40,7 +39,6 @@ def test_simple():
 
 def test_counter():
     modules.clear()
-    u1 = uint[1]
     w = 10
 
     m = module("test")
@@ -68,7 +66,6 @@ def test_counter():
 
 def test_struct():
     modules.clear()
-    u1 = uint[1]
 
     @struct
     class Data:

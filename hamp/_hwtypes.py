@@ -207,3 +207,4 @@ def sync_reset() -> _SyncReset:
 
 uint = _IntFactory(_UInt)
 sint = _IntFactory(_SInt)
+u1 = uint[1]

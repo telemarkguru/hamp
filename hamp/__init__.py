@@ -1,6 +1,7 @@
 from ._hwtypes import (
     uint,
     sint,
+    u1,
     clock,
     reset,
     async_reset,
@@ -24,6 +25,7 @@ from ._module import (
 __all__ = (
     "uint",
     "sint",
+    "u1",
     "clock",
     "reset",
     "async_reset",
