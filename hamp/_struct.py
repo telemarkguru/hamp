@@ -11,20 +11,12 @@ def struct(c):
     calls dataclass to generate a dataclass Python class
     """
 
-    annotations = c.__annotations__
-
-    class Struct(c, _Struct):
-        __annotations__ = annotations
-
-    c = Struct
-
     c.__flips__ = set()
-    for a in annotations:
-        t = annotations[a]
+    for a, t in c.__annotations__.items():
         if isinstance(t, tuple):
             t, _ = t
             c.__flips__.add(a)
-            annotations[a] = t
+            c.__annotations__[a] = t
         if isinstance(t, _Int):
             if not hasattr(c, a):
                 setattr(c, a, t(0))
@@ -40,7 +32,7 @@ def struct(c):
                 "Only sized uint, sint and structs based on these are allowed."
             )
     c.__hamp_struct__ = True
-    return dataclass(c)
+    return _Struct(dataclass(c))
 
 
 def flip(type):
@@ -54,25 +46,28 @@ def flip(type):
     return type, True
 
 
-def member(cls, name: str) -> Union[type, None]:
+def member(s: _Struct, name: str) -> Union[type, None]:
     """Return member type if struct class has member with given name.
     Return None if not.
     """
-    if hasattr(cls, "__hamp_struct__"):
-        return cls.__annotations__.get(name)
-    return None
+    assert isinstance(s, _Struct)
+    m = s.dataclass.__annotations__.get(name)
+    if m is None:
+        raise AttributeError(f"Struct {s} has no member {name}")
+    return m
 
 
-def hasmember(cls, name: str) -> bool:
+def hasmember(s: _Struct, name: str) -> bool:
     """Return True if struct class has member with given name.
     Return False if not.
     """
-    return member(cls, name) is not None
+    return member(s, name) is not None
 
 
-def members(cls) -> Iterator[Tuple[str, _HWType]]:
+def members(s: _Struct) -> Iterator[Tuple[str, _HWType]]:
     """Iterator over hardware type members, yield tuples with (name, type)"""
-    for f in fields(cls):
+    assert isinstance(s, _Struct)
+    for f in fields(s.dataclass):
         t = f.type
         if isinstance(t, _HWType):
             yield f.name, t

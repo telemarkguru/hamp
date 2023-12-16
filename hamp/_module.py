@@ -190,11 +190,13 @@ class _Module:
 class _DataMember(_ModuleMember):
     """A member holding data"""
 
-    type: _HWType
+    type: Union[_HWType, _Module]
 
 
 class _Port(_DataMember):
     """Port module member"""
+
+    type: _HWType
 
     def __init__(self, type: _HWType, direction: _Direction):
         self.type = type
@@ -208,12 +210,16 @@ class _LocalDataMember(_DataMember):
 class _Wire(_LocalDataMember):
     """Wire module member"""
 
+    type: _HWType
+
     def __init__(self, type: _HWType):
         self.type = type
 
 
 class _Register(_LocalDataMember):
     """State module member"""
+
+    type: _HWType
 
     def __init__(
         self,
@@ -235,6 +241,7 @@ class _Instance(_LocalDataMember):
     """Module instance module member"""
 
     name: str
+    type: _Module
 
     def __init__(self, module: _Module):
         self.module = module

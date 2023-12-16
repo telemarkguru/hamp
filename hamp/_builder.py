@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from typing import Union, Tuple, List, Any
 from . import _module
-from . import _hwtypes
+from ._hwtypes import _Struct, _Int, _SInt, _Array
 from ._struct import member
 
 
@@ -29,8 +29,8 @@ class _VarBuilder:
         self.builder.code.append(("connect", f"{self.name}.{name}", value))
 
     def __getattr__(self, name) -> "_VarBuilder":
-        if m := member(self.item, name):
-            item = m
+        if isinstance(self.item, _Struct):
+            item = member(self.item, name)
         elif hasattr(self.item, name):
             item = getattr(self.item, name)
         else:
@@ -38,7 +38,7 @@ class _VarBuilder:
         return _VarBuilder(self.builder, f"{self.name}.{name}", item)
 
     def _chk_slice(self, slice):
-        if not isinstance(self.item, _hwtypes._Int):
+        if not isinstance(self.item, _Int):
             raise TypeError(f"{self.name} is not a bit-vector")
         error = None
         if not (isinstance(slice.start, int) and isinstance(slice.stop, int)):
@@ -52,7 +52,7 @@ class _VarBuilder:
             raise IndexError(f"{error}: {self.name}[{slicestr}]")
 
     def _chk_idx(self, idx):
-        if not isinstance(self.item, _hwtypes._Array):
+        if not isinstance(self.item, _Array):
             raise TypeError(f"{self.name} is not an array")
         if isinstance(idx, int):
             size = self.item.size
@@ -67,7 +67,7 @@ class _VarBuilder:
         if isinstance(idx, slice):
             self._chk_slice(idx)
             return ("bits", self.name, idx.start, idx.stop)
-        elif isinstance(self.item, _hwtypes._Int):
+        elif isinstance(self.item, _Int):
             return self[idx:idx]
         idx = self._chk_idx(idx)
         return _VarBuilder(self.builder, f"{self.name}[{idx}]", self.item.type)
@@ -177,9 +177,9 @@ def _logic_str(value: ExprType) -> ExprRType:
     if isinstance(value, _VarBuilder):
         item = value.item
         if (
-            isinstance(item, _hwtypes._Int)
+            isinstance(item, _Int)
             and item.size != 1
-            or isinstance(item, _hwtypes._SInt)
+            or isinstance(item, _SInt)
         ):
             return ("orr", value.name)
         return value.name

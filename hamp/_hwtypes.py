@@ -162,9 +162,14 @@ class _Struct(_HWType):
 
     type = "Struct"
 
-    def __class_getitem__(cls, size: int) -> "_Array":
-        """Create array type"""
-        return _Array(cls, size)
+    def __init__(self, dataclass):
+        self.dataclass = dataclass
+
+    def __getattr__(self, x):
+        return getattr(self.dataclass, x)
+
+    def __call__(self, *args, **kwargs):
+        return self.dataclass(*args, **kwargs)
 
 
 class _Direction:

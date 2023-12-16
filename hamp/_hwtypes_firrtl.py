@@ -56,13 +56,12 @@ def apply():
         return f"{self.type.firrtl()}[{self.size}]"
 
     @_apply(hw._Struct)
-    @classmethod
     def firrtl(self) -> str:
         return (
             "{"
             + ", ".join(
                 f"{_flip(self, x.name)}{x.name}: {x.type.firrtl()}"
-                for x in fields(self)
+                for x in fields(self.dataclass)
             )
             + "}"
         )
