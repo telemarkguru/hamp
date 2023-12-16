@@ -167,6 +167,27 @@ def test_op2():
     assert b.code[-1] == ("connect", "x", ("neg", "y"))
 
 
+def test_expressions():
+    """Test nested expressions"""
+
+    b = _setup()
+
+    b.x = ((b.y + 1) // b.z + (1 + b.s[b.x + b.y])) % 32
+    assert b.code[-1] == (
+        "connect",
+        "x",
+        (
+            "%",
+            (
+                "+",
+                ("//", ("+", "y", 1), "z"),
+                ("+", 1, ("[]", "s", ("+", "x", "y"))),
+            ),
+            32,
+        ),
+    )
+
+
 def test_logop():
     """Test and/or/not"""
 
@@ -219,13 +240,13 @@ def test_array_indexing():
     b = _setup()
 
     b.y = b.s[b.x]
-    assert b.code[-1] == ("connect", "y", "s[x]")
+    assert b.code[-1] == ("connect", "y", ("[]", "s", "x"))
 
     b.y = b.s[1]
-    assert b.code[-1] == ("connect", "y", "s[1]")
+    assert b.code[-1] == ("connect", "y", ("[]", "s", 1))
 
     b.s[b.x] = b.y
-    assert b.code[-1] == ("connect", "s[x]", "y")
+    assert b.code[-1] == ("connect", ("[]", "s", "x"), "y")
 
     with raises(IndexError, match=r"s\[21\] is out of range \(size=20\)"):
         b.y = b.s[21]

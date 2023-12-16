@@ -3,12 +3,12 @@
 from contextlib import contextmanager
 from typing import Union, Tuple, List, Any
 from . import _module
-from ._hwtypes import _Struct, _Int, _SInt, _Array
+from ._hwtypes import _Struct, _Int, _SInt, _Array, u1
 from ._struct import member
 
 
-ExprType = Union[str, int, "_VarBuilder", Tuple["ExprType", ...]]
-ExprRType = Union[str, int, tuple["ExprType", ...]]
+ExprType = Union[str, int, "_VarBuilder"]
+ExprRType = Union[str, int, tuple["ExprRType", ...]]
 
 
 class _VarBuilder:
@@ -16,26 +16,29 @@ class _VarBuilder:
 
     _VARS = set(("builder", "item", "name"))
 
-    def __init__(self, builder: "_CodeBuilder", name: str, item):
+    def __init__(self, builder: "_CodeBuilder", name: ExprRType, item):
         self.builder = builder
         self.name = name
         self.item = item
+
+    def _expr(self, e: ExprRType, item=None) -> "_VarBuilder":
+        return _VarBuilder(self.builder, e, item or self.item)
 
     def __setattr__(self, name, value):
         value = _value_str(value)
         if name in _VarBuilder._VARS:
             super().__setattr__(name, value)
             return
-        self.builder.code.append(("connect", f"{self.name}.{name}", value))
+        self.builder.code.append(("connect", (".", self.name, name), value))
 
-    def __getattr__(self, name) -> "_VarBuilder":
+    def __getattr__(self, name: str) -> "_VarBuilder":
         if isinstance(self.item, _Struct):
             item = member(self.item, name)
         elif hasattr(self.item, name):
             item = getattr(self.item, name)
         else:
             raise AttributeError(f"{self.name} has no member {name}")
-        return _VarBuilder(self.builder, f"{self.name}.{name}", item)
+        return self._expr((".", self.name, name), item)
 
     def _chk_slice(self, slice):
         if not isinstance(self.item, _Int):
@@ -60,111 +63,117 @@ class _VarBuilder:
                 raise IndexError(
                     f"{self.name}[{idx}] is out of range (size={size})"
                 )
-            idx = str(idx)
+            return idx
         return _value_str(idx)
 
-    def __getitem__(self, idx) -> Union["_VarBuilder", ExprRType]:
+    def __getitem__(self, idx) -> "_VarBuilder":
         if isinstance(idx, slice):
             self._chk_slice(idx)
-            return ("bits", self.name, idx.start, idx.stop)
+            return self._expr(("bits", self.name, idx.start, idx.stop))
         elif isinstance(self.item, _Int):
             return self[idx:idx]
         idx = self._chk_idx(idx)
-        return _VarBuilder(self.builder, f"{self.name}[{idx}]", self.item.type)
+        return self._expr(("[]", self.name, _value_str(idx)))
 
-    def __setitem__(self, idx, value):
+    def __setitem__(self, idx, value) -> None:
         idx = self._chk_idx(idx)
-        value = _value_str(value)
-        self.builder.code.append(("connect", f"{self.name}[{idx}]", value))
+        v1 = _value_str(value)
+        self.builder.code.append(("connect", ("[]", self.name, idx), v1))
 
-    def _op2(self, op: str, value: ExprType) -> ExprRType:
-        value = _value_str(value)
-        return (op, self.name, value)
+    def _op2(self, op: str, value: ExprType, item=None) -> "_VarBuilder":
+        v1 = _value_str(self)
+        v2 = _value_str(value)
+        return self._expr((op, v1, v2), item)
 
-    def _rop2(self, op: str, value: ExprType) -> ExprRType:
-        value = _value_str(value)
-        return (op, value, self.name)
+    def _rop2(self, op: str, value: ExprType) -> "_VarBuilder":
+        v1 = _value_str(value)
+        v2 = _value_str(self)
+        return self._expr((op, v1, v2))
 
-    def _op1(self, op: str) -> ExprRType:
-        return (op, self.name)
+    def _op1(self, op: str) -> "_VarBuilder":
+        v1 = _value_str(self)
+        return self._expr((op, v1))
 
-    def __add__(self, value: ExprType) -> ExprRType:
+    def __add__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("+", value)
 
-    def __radd__(self, value: ExprType) -> ExprRType:
+    def __radd__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("+", value)
 
-    def __sub__(self, value: ExprType) -> ExprRType:
+    def __sub__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("-", value)
 
-    def __rsub__(self, value: ExprType) -> ExprRType:
+    def __rsub__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("-", value)
 
-    def __mul__(self, value: ExprType) -> ExprRType:
+    def __mul__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("*", value)
 
-    def __rmul__(self, value: ExprType) -> ExprRType:
+    def __rmul__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("*", value)
 
-    def __mod__(self, value: ExprType) -> ExprRType:
+    def __mod__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("%", value)
 
-    def __rmod__(self, value: ExprType) -> ExprRType:
-        return self._rop2("%", value)
+    def __floordiv__(self, value: ExprType) -> "_VarBuilder":
+        return self._op2("//", value)
 
-    def __or__(self, value: ExprType) -> ExprRType:
+    def __rfloordiv__(self, value: ExprType) -> "_VarBuilder":
+        return self._rop2("//", value)
+
+    def __or__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("|", value)
 
-    def __ror__(self, value: ExprType) -> ExprRType:
+    def __ror__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("|", value)
 
-    def __and__(self, value: ExprType) -> ExprRType:
+    def __and__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("&", value)
 
-    def __rand__(self, value: ExprType) -> ExprRType:
+    def __rand__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("&", value)
 
-    def __xor__(self, value: ExprType) -> ExprRType:
+    def __xor__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("^", value)
 
-    def __rxor__(self, value: ExprType) -> ExprRType:
+    def __rxor__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("^", value)
 
-    def __lshift__(self, value: ExprType) -> ExprRType:
+    def __lshift__(self, value: ExprType) -> "_VarBuilder":
         return self._op2("<<", value)
 
-    def __rlshift__(self, value: ExprType) -> ExprRType:
+    def __rlshift__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2("<<", value)
 
-    def __rshift__(self, value: ExprType) -> ExprRType:
+    def __rshift__(self, value: ExprType) -> "_VarBuilder":
         return self._op2(">>", value)
 
-    def __rrshift__(self, value: ExprType) -> ExprRType:
+    def __rrshift__(self, value: ExprType) -> "_VarBuilder":
         return self._rop2(">>", value)
 
-    def __neg__(self) -> ExprRType:
+    def __neg__(self) -> "_VarBuilder":
         return self._op1("neg")
 
-    def __pos__(self) -> ExprRType:
+    def __pos__(self) -> "_VarBuilder":
         return self._op1("pos")
 
-    def __eq__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2("==", value)
+    def __eq__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2("==", value, u1)
 
-    def __ge__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2(">=", value)
+    def __ge__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2(">=", value, u1)
 
-    def __gt__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2(">", value)
+    def __gt__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2(">", value, u1)
 
-    def __le__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2("<=", value)
+    def __le__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2("<=", value, u1)
 
-    def __lt__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2("<", value)
+    def __lt__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2("<", value, u1)
 
-    def __ne__(self, value: ExprType) -> ExprRType:  # type: ignore[override]
-        return self._op2("!=", value)
+    def __ne__(self, value: ExprType) -> "_VarBuilder":  # type: ignore[override]
+        return self._op2("!=", value, u1)
 
 
 def _value_str(value: ExprType) -> ExprRType:

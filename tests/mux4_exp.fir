@@ -10,11 +10,11 @@ circuit mux4 :
     inst m2 of mux
     inst m3 of mux
 
-    m1.a <= a[0]
-    m1.b <= a[1]
+    m1.a <= a[UInt(0)]
+    m1.b <= a[UInt(1)]
     m1.sel <= bits(sel, 0, 0)
-    m2.a <= a[2]
-    m2.b <= a[3]
+    m2.a <= a[UInt(2)]
+    m2.b <= a[UInt(3)]
     m2.sel <= bits(sel, 0, 0)
     m3.a <= m1.x
     m3.b <= m2.x

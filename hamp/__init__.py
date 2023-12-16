@@ -20,7 +20,10 @@ from ._module import (
     instance,
     modules,
 )
-
+from ._struct import (
+    struct,
+)
+from ._firrtl import generate as generate_firrtl
 
 __all__ = (
     "uint",
@@ -41,4 +44,6 @@ __all__ = (
     "unique",
     "instance",
     "modules",
+    "struct",
+    "generate_firrtl",
 )

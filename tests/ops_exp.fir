@@ -11,7 +11,7 @@ circuit ops :
 
     
 
-    x[0] <= dshr(a, b)
-    x[1] <= dshl(a, b)
-    y[0] <= dshr(c, b)
-    y[1] <= dshl(c, b)
+    x[UInt(0)] <= dshr(a, b)
+    x[UInt(1)] <= dshl(a, b)
+    y[UInt(0)] <= dshr(c, b)
+    y[UInt(1)] <= dshl(c, b)

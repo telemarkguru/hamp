@@ -32,6 +32,7 @@ _op_to_func = {
     "+": _op2("add"),
     "-": _op2("sub"),
     "*": _op2("mul"),
+    "//": _op2("div"),
     "%": _op2("rem"),
     "==": _op2("eq"),
     "!=": _op2("neq"),
@@ -55,6 +56,8 @@ _op_to_func = {
     "xorr": _op1("xorr"),
     "cat": _op2("cat"),
     "bits": _op3("bits", 1, 2),
+    ".": ("{e[0]}.{e[1]}", 2, 0),
+    "[]": ("{e[0]}[{e[1]}]", 2, 0),
 }
 
 
@@ -142,7 +145,7 @@ def _expr(x, signed=False) -> str:
         return str(x)
     op = x[0]
     if op == "connect":
-        return f"{x[1]} <= {_expr(x[2])}"
+        return f"{_expr(x[1])} <= {_expr(x[2])}"
     elif op == "when":
         return f"when {_expr(x[1])} :"
     elif op == "else":
