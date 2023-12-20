@@ -134,6 +134,11 @@ def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
     # Remove @xx.code decorator:
     start = srccode.find("def ")
     srccode = srccode[start:]
+    file = func.__code__.co_filename
+    line = func.__code__.co_firstlineno
+    code = compile(srccode, file, "exec")
     syms: Dict[str, Any] = {**func.__globals__, **_closure_locals(func)}
-    exec(srccode, syms)
-    return syms[func.__name__], srccode
+    exec(code, syms)
+    newfunc = syms[func.__name__]
+    newfunc.__code__ = newfunc.__code__.replace(co_firstlineno=line)
+    return newfunc, srccode
