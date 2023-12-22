@@ -35,23 +35,23 @@ used.  The default clock is named "clk" and the default reset is named
 "rst":
 
 ```Python
-from hamp import module, input, output, wire, register, uint
+from hamp import module, input, output, wire, register, uint, u1, struct, flip
 
 
 def create_fifo(size, data_type):
 
-    u1 = uint[1]
+    @struct
+    class fifo_if_type:
+        valid: u1
+        ready: flip(u1)
+        data: data_type
 
     ptr_type = uint[(size-1).bit_length()]
     cnt_type = uint[size.bit_length()]
 
     m = module(f"fifo_{size}")
-    m.in_valid = input(u1)
-    m.in_ready = output(u1)
-    m.in_data = input(data_type)
-    m.out_valid = output(u1)
-    m.out_ready = input(u1)
-    m.out_data = output(data_type)
+    m.push = input(fifo_if_type)
+    m.pop = output(fifo_if_type)
 
     m.data = register(data_type[size])
     m.iptr = register(ptr_type, reset_value=0)
@@ -62,28 +62,30 @@ def create_fifo(size, data_type):
     m.ostb = wire(u1)
 
     @m.code
-    def fifo(mb):
-        mb.in_ready = mb.cnt < size
-        mb.out_valid = mb.cnt > 0
-        mb.istb = mb.in_valid and mb.in_ready
-        mb.ostb = mb.out_valid and mb.out_ready
-        if mb.istb:
-            mb.data[iptr] = mb.in_data
-            mb.iptr = (mb.iptr + 1) % size
-        if mb.ostb:
-            mb.optr = (mb.optr + 1) % size
-        if mb.istb and not mb.ostb:
-            mb.cnt = mb.cnt + 1
-        elif mb.ostb and not mb.istb:
-            mb.cnt = mb.cnt - 1
+    def fifo(x):
+        x.push.ready = x.cnt < size
+        x.pop.valid = x.cnt > 0
+        x.istb = x.push.valid and x.push.ready
+        x.ostb = x.pop.valid and x.pop.ready
+        x.pop.data = x.data[x.optr]
+        if x.istb:
+            x.data[iptr] = x.push.data
+            x.iptr = (x.iptr + 1) % size
+        if x.ostb:
+            x.optr = (x.optr + 1) % size
+        if x.istb and not x.ostb:
+            x.cnt = x.cnt + 1
+        elif x.ostb and not x.istb:
+            x.cnt = x.cnt - 1
 
-    return m
+    return m, fifo_if_type
 
 
-fifo1 = create_fifo(42, uint[10])
+fifo1, fifo1_if_type = create_fifo(42, uint[10])
 
 # Add DFT ports:
-fifo1.dft = input(dft_type)
+fifo1.dft_in = input(uint[10])
+fifo1.dft_out = output(uint[3])
 
 ```
 
