@@ -53,10 +53,10 @@ def create_fifo(size, data_type):
     m.push = input(fifo_if_type)
     m.pop = output(fifo_if_type)
 
-    m.data = register(data_type[size])
-    m.iptr = register(ptr_type, reset_value=0)
-    m.optr = register(ptr_type, reset_value=0)
-    m.cnt = register(cnt_type, reset_value=0)
+    m.data = register(data_type[size], reset=False)
+    m.iptr = register(ptr_type, value=0)
+    m.optr = register(ptr_type, value=0)
+    m.cnt = register(cnt_type, value=0)
 
     m.istb = wire(u1)
     m.ostb = wire(u1)
@@ -81,12 +81,27 @@ def create_fifo(size, data_type):
     return m, fifo_if_type
 
 
+# Create FIFO module 42 deep, for 10-but unsigned integers:
 fifo1, fifo1_if_type = create_fifo(42, uint[10])
 
 # Add DFT ports:
-fifo1.dft_in = input(uint[10])
-fifo1.dft_out = output(uint[3])
+fifo1.dft_in = input(some_dft_type1)
+fifo1.dft_out = output(some_dft_type2)
 
+
+# Use fifo1 module:
+
+m = module("use_fifo1")
+...
+m.fifo = fifo1()
+
+@m.code
+def connect_fifo(x):
+    x.fifo.push.valid = ...
+    x.fifo.push.data = ...
+
+    if x.fifo.pop.valid:
+        ...
 ```
 
 ## Data types
