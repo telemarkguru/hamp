@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from typing import Union, Tuple, List, Any
 from . import _module
-from ._hwtypes import _Struct, _Int, _SInt, _Array, u1
+from ._hwtypes import _Struct, _Int, _SInt, _Array, u1, uint, _IntValue
 from ._struct import member
 
 
@@ -25,10 +25,10 @@ class _VarBuilder:
         return _VarBuilder(self.builder, e, item or self.item)
 
     def __setattr__(self, name, value):
-        value = _value_str(value)
         if name in _VarBuilder._VARS:
             super().__setattr__(name, value)
             return
+        value, item = _value_str(value)
         self.builder.code.append(("connect", (".", self.name, name), value))
 
     def __getattr__(self, name: str) -> "_VarBuilder":
@@ -63,35 +63,39 @@ class _VarBuilder:
                 raise IndexError(
                     f"{self.name}[{idx}] is out of range (size={size})"
                 )
-            return idx
+            return idx, 0
         return _value_str(idx)
 
     def __getitem__(self, idx) -> "_VarBuilder":
         if isinstance(idx, slice):
             self._chk_slice(idx)
-            return self._expr(("bits", self.name, idx.start, idx.stop))
+            size = idx.start - idx.stop + 1
+            return self._expr(
+                ("bits", self.name, idx.start, idx.stop), uint[size]
+            )
         elif isinstance(self.item, _Int):
             return self[idx:idx]
-        idx = self._chk_idx(idx)
-        return self._expr(("[]", self.name, _value_str(idx)))
+        idx, item = self._chk_idx(idx)
+        # TODO: check type
+        return self._expr(("[]", self.name, idx), self.item.type)
 
     def __setitem__(self, idx, value) -> None:
-        idx = self._chk_idx(idx)
-        v1 = _value_str(value)
+        idx, idxitem = self._chk_idx(idx)
+        v1, item = _value_str(value)
         self.builder.code.append(("connect", ("[]", self.name, idx), v1))
 
     def _op2(self, op: str, value: ExprType, item=None) -> "_VarBuilder":
-        v1 = _value_str(self)
-        v2 = _value_str(value)
+        v1, i1 = _value_str(self)
+        v2, i2 = _value_str(value)
         return self._expr((op, v1, v2), item)
 
     def _rop2(self, op: str, value: ExprType) -> "_VarBuilder":
-        v1 = _value_str(value)
-        v2 = _value_str(self)
+        v1, i1 = _value_str(value)
+        v2, i2 = _value_str(self)
         return self._expr((op, v1, v2))
 
     def _op1(self, op: str) -> "_VarBuilder":
-        v1 = _value_str(self)
+        v1, i1 = _value_str(self)
         return self._expr((op, v1))
 
     def __add__(self, value: ExprType) -> "_VarBuilder":
@@ -178,8 +182,12 @@ class _VarBuilder:
 
 def _value_str(value: ExprType) -> ExprRType:
     if isinstance(value, _VarBuilder):
-        return value.name
-    return value
+        return value.name, value.item
+    if isinstance(value, _IntValue):
+        return value, value.type
+    if not isinstance(value, int):
+        raise TypeError(f"Expected integer, got '{value}'")
+    return value, value.bit_length()
 
 
 def _logic_str(value: ExprType) -> ExprRType:
@@ -202,7 +210,7 @@ CodeListItemType = Tuple[Any, ...]
 class _CodeBuilder:
     """Represents a module when generating code"""
 
-    _VARS = set(("module", "code"))
+    _VARS = set(("module", "code", "cat"))
 
     def __init__(self, module: _module._Module):
         self.module = module
@@ -216,8 +224,9 @@ class _CodeBuilder:
         assert name in self.module
         item = self.module[name]
         assert isinstance(item, _module._DataMember)
-        # TODO: check that member is output or wire
-        self.code.append(("connect", name, _value_str(value)))
+        # TODO: check that member is (part of) output, wire or register
+        v1, it = _value_str(value)
+        self.code.append(("connect", name, v1))
 
     def iter_with_indent(self):
         indent = 0
@@ -279,17 +288,43 @@ class _CodeBuilder:
         finally:
             self.code.append(("end_when",))
 
-    def _reduce_op(self, name, *ops):
+    def _reduce_logic_op(self, name, *ops):
+        assert len(ops) >= 2
         if len(ops) == 2:
-            return (name, _logic_str(ops[0]), _logic_str(ops[1]))
+            return _VarBuilder(
+                self, (name, _logic_str(ops[0]), _logic_str(ops[1])), u1
+            )
         op, *rops = ops
-        return (name, _logic_str(op), self._reduce_op(name, *rops))
+        op2 = self._reduce_logic_op(name, *rops)
+        return _VarBuilder(self, (name, _logic_str(op), op2.name), u1)
 
     def and_expr(self, *ops):
-        return self._reduce_op("and", *ops)
+        return self._reduce_logic_op("and", *ops)
 
     def or_expr(self, *ops):
-        return self._reduce_op("or", *ops)
+        return self._reduce_logic_op("or", *ops)
 
     def not_expr(self, op):
-        return ("not", _logic_str(op))
+        return _VarBuilder(self, ("not", _logic_str(op)), u1)
+
+    def _reduce_op(self, name, typecheck, *ops):
+        assert len(ops) >= 2
+        if len(ops) == 2:
+            v1, i1 = _value_str(ops[0])
+            v2, i2 = _value_str(ops[1])
+            t = typecheck(i1, i2)
+            return _VarBuilder(self, (name, v1, v2), t)
+        op, *rops = ops
+        v1, i1 = _value_str(op)
+        op2 = self._reduce_op(name, *rops)
+        i2 = op2.item
+        t = typecheck(i1, i2)
+        return _VarBuilder(self, (name, v1, op2.name), t)
+
+    def _cat_typecheck(self, t1, t2):
+        assert isinstance(t1, _Int)
+        assert isinstance(t2, _Int)
+        return uint[t1.size + t2.size]
+
+    def cat(self, *ops):
+        return self._reduce_op("cat", self._cat_typecheck, *ops)

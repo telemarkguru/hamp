@@ -2,7 +2,6 @@ from hamp._firrtl import generate
 from hamp._module import module, input, output, wire, register, modules
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
-from hamp._stdlib import cat
 from os.path import dirname, abspath
 
 
@@ -132,7 +131,7 @@ def test_index():
 
     @m.code
     def main(x):  # pragma: no cover
-        x.z = cat(x.a[x.x][x.y], x.b)
+        x.z = x.cat(x.a[x.x][x.y], x.b)
 
     _generate_and_check("index", m)
 

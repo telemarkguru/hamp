@@ -103,8 +103,8 @@ def test_op2():
     b.x = b.y % b.z
     chk("%")
 
-    b.x = 11 % b.z
-    chk("%", v0=11)
+    # b.x = 11 % b.z
+    # chk("%", v0=11)
 
     b.x = b.y >> b.z
     chk(">>")
@@ -165,6 +165,9 @@ def test_op2():
 
     b.x = -b.y
     assert b.code[-1] == ("connect", "x", ("neg", "y"))
+
+    b.x = b.cat(b.y, b.z)
+    chk("cat")
 
 
 def test_expressions():

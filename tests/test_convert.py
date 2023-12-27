@@ -10,22 +10,22 @@ def test_closure():
 
     a = 3
 
-    def xyz(p):
+    def xyz(p):  # pragma: no cover
         return p + a
 
-    def fx(x):
-        z = xyz(3) + xyz(4)
+    def fx(x):  # pragma: no cover
+        z = xyz(x + 3) + xyz(4)
         return z
 
     f, txt = convert(fx, m)
 
-    assert f(0) == 13
+    assert f(1) == 14
     assert (
         txt
         == dedent(
             """
             def fx(x):
-                z = xyz(3) + xyz(4)
+                z = xyz(x + 3) + xyz(4)
                 return z
             """
         ).strip()
