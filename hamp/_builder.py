@@ -41,6 +41,9 @@ class _Expr:
         else:
             return uint[size]
 
+    def expr(self):
+        assert False
+
     def _chk_slice(self, slice):
         error = None
         if not (isinstance(slice.start, int) and isinstance(slice.stop, int)):
@@ -171,7 +174,7 @@ class _ConstExpr(_Expr):
         return (t.type, t.size, self.value.value)
 
 
-def _infer_int(type, value):
+def _infer_int(type, value) -> _Expr:
     if not isinstance(type, _Int):
         raise TypeError(f"Cannot infer integer for type {type}")
     return _ConstExpr(value, type.signed, type.size)
@@ -481,8 +484,7 @@ class _StructVar(_Var):
 
     def __getattr__(self, name: str) -> _Var:
         item = member(self.type, name)
-        type = _type_to_vartype(item)
-        return type(item, name, self._builder, self)
+        return _vartype(item, name, self._builder, self)
 
     def __setattr__(self, name: str, value: Union[_Expr, int]):
         if name in _StructVar._VARS:
@@ -533,17 +535,18 @@ class _ArrayVar(_Var):
     def __getitem__(self, idx: OpType) -> _Var:
         if isinstance(idx, slice):
             raise TypeError(f"{self._name} is not a bit-vector")
-        type = _type_to_vartype(self.type.type)
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
         self.idx = idx
-        return type(self.type.type, "", self._builder, self)
+        return _vartype(self.type.type, "", self._builder, self)
 
     def __setitem__(self, idx: OpType, value: OpType) -> None:
         type = self.type.type
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
         self.idx = idx
+        if isinstance(value, int):
+            value = _ConstExpr(value, type.signed)
         if not equivalent(value.type, type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {type}"
@@ -584,8 +587,7 @@ class _InstanceVar(_Var):
             )
         item = self.type[name]
         if isinstance(item, _module._DataMember):
-            type = _type_to_vartype(item.type)
-            return type(item.type, name, self._builder, self)
+            return _vartype(item.type, name, self._builder, self)
         raise TypeError(
             f"Cannot access {name} in instance of {self.type.type.name}"
         )
@@ -613,14 +615,14 @@ class _InstanceVar(_Var):
         return (".", self._name, name)
 
 
-def _type_to_vartype(x) -> Type[_Var]:
-    if isinstance(x, _Struct):
-        return _StructVar
-    elif isinstance(x, _Array):
-        return _ArrayVar
-    elif isinstance(x, _module._Module):
-        return _InstanceVar
-    return _IntVarExpr
+def _vartype(type, name, builder, base) -> _Var:
+    if isinstance(type, _Struct):
+        return _StructVar(type, name, builder, base)
+    elif isinstance(type, _Array):
+        return _ArrayVar(type, name, builder, base)
+    elif isinstance(type, _module._Module):
+        return _InstanceVar(type, name, builder, base)
+    return _IntVarExpr(type, name, builder, base)
 
 
 def _logic_value(value: OpType) -> OpType:
@@ -660,8 +662,8 @@ class _CodeBuilder:
         if isinstance(item, _module._ModuleFunc):
             return self.module[name]
         if isinstance(item, _module._DataMember):
-            type = _type_to_vartype(item.type)
-            return type(item.type, name, self, None)
+            return _vartype(item.type, name, self, None)
+        return False
 
     def __setattr__(self, name: str, value) -> None:
         """Assign value"""

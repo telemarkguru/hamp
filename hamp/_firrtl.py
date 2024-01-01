@@ -6,6 +6,7 @@ from . import _module as m
 from ._generate import code
 from ._hwtypes import _IntValue, _Reset, _Clock
 from ._hwtypes_firrtl import apply
+from typing import Union
 
 
 apply()
@@ -139,13 +140,9 @@ def _statements(module: m._Module) -> str:
     )
 
 
-def _expr(x, signed=False) -> str:
+def _expr(x, signed=False) -> Union[str, int]:
     if isinstance(x, int):
         return x
-        if x >= 0 and not signed:
-            return f"UInt({x})"
-        else:
-            return f"SInt({x})"
     if isinstance(x, _IntValue):
         return x.firrtl()
     if not isinstance(x, (tuple, list)):
