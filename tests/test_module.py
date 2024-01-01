@@ -1,5 +1,5 @@
 import hamp._module as mod
-from hamp._hwtypes import uint, sint, clock, reset
+from hamp._hwtypes import uint, sint, clock, reset, u1
 import pytest
 
 
@@ -146,3 +146,18 @@ def test_module_not_an_attribute():
     m.x = mod.wire(uint[3])
     with pytest.raises(KeyError, match="Module member x is not an attribute"):
         m.attr("x")
+
+
+def test_reserved_name():
+    mod.modules.clear()
+    m = mod.module("foo")
+    with pytest.raises(NameError, match=r"Name cat is reserved"):
+        m.cat = mod.input(u1)
+
+
+def test_iter_ports():
+    mod.modules.clear()
+    m = mod.module("ports")
+    m.a = mod.input(u1)
+    m.b = mod.output(u1)
+    assert list(mod.ports(m)) == [m.a, m.b]

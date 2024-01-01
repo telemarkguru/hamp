@@ -22,7 +22,8 @@ class B:
 def _setup():
     modules.clear()
     m = module("mod")
-    m.x = output(uint[10])
+    m.x = output(uint[11])
+    m.xs = output(sint[11])
     m.y = input(uint[10])
     m.z = wire(uint[10])
     m.s = wire(uint[10][20])
@@ -34,25 +35,25 @@ def _setup():
 def test_code_builder():
     b = _setup()
     b.x = 3
-    assert b.code == [("connect", "x", 3)]
+    assert b.code == [("connect", "x", ("uint", 11, 3))]
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
-        b.x = -1
+        b.x = 7
     with b.elif_stmt(b.y > b.z):
         b.x = 10
     with b.else_stmt():
         b.x = 0
 
     assert b.code == [
-        ("connect", "x", 3),
+        ("connect", "x", ("uint", 11, 3)),
         ("connect", "x", ("+", "y", "z")),
         ("when", ("==", "y", "z")),
-        ("connect", "x", -1),
+        ("connect", "x", ("uint", 11, 7)),
         ("else_when", (">", "y", "z")),
-        ("connect", "x", 10),
+        ("connect", "x", ("uint", 11, 10)),
         ("else",),
-        ("connect", "x", 0),
+        ("connect", "x", ("uint", 11, 0)),
         ("end_when",),
     ]
 
@@ -60,14 +61,14 @@ def test_code_builder():
         str(b)
         == dedent(
             """
-        ('connect', 'x', 3)
+        ('connect', 'x', ('uint', 11, 3))
         ('connect', 'x', ('+', 'y', 'z'))
         ('when', ('==', 'y', 'z'))
-            ('connect', 'x', -1)
+            ('connect', 'x', ('uint', 11, 7))
         ('else_when', ('>', 'y', 'z'))
-            ('connect', 'x', 10)
+            ('connect', 'x', ('uint', 11, 10))
         ('else',)
-            ('connect', 'x', 0)
+            ('connect', 'x', ('uint', 11, 0))
         ('end_when',)
     """
         ).strip()
@@ -80,6 +81,10 @@ def test_op2():
     b = _setup()
 
     def chk(op, v0="y", v1="z"):
+        if isinstance(v0, int):
+            v0 = ("uint", -1, v0)
+        if isinstance(v1, int):
+            v1 = ("uint", -1, v1)
         assert b.code[-1] == ("connect", "x", (op, v0, v1))
 
     b.x = b.y + b.z
@@ -91,14 +96,17 @@ def test_op2():
     b.x = b.y - b.z
     chk("-")
 
-    b.x = -1 - b.z
-    chk("-", v0=-1)
+    b.x = 2 - b.z
+    chk("-", v0=2)
 
     b.x = b.y * b.z
     chk("*")
 
     b.x = 10 * b.z
     chk("*", v0=10)
+
+    b.x = 10 // b.z
+    chk("//", v0=10)
 
     b.x = b.y % b.z
     chk("%")
@@ -148,8 +156,8 @@ def test_op2():
     b.x = b.y > 1
     chk(">", v1=1)
 
-    b.x = b.y > -10
-    chk(">", v1=-10)
+    b.x = b.y > 10
+    chk(">", v1=10)
 
     b.x = b.y >= b.z
     chk(">=")
@@ -161,10 +169,13 @@ def test_op2():
     chk("<=")
 
     b.x = +b.y
-    assert b.code[-1] == ("connect", "x", ("pos", "y"))
+    assert b.code[-1] == ("connect", "x", "y")
 
-    b.x = -b.y
-    assert b.code[-1] == ("connect", "x", ("neg", "y"))
+    b.xs = -b.y
+    assert b.code[-1] == ("connect", "xs", ("neg", "y"))
+
+    b.x = ~b.y
+    assert b.code[-1] == ("connect", "x", ("not", "y"))
 
     b.x = b.cat(b.y, b.z)
     chk("cat")
@@ -183,10 +194,10 @@ def test_expressions():
             "%",
             (
                 "+",
-                ("//", ("+", "y", 1), "z"),
-                ("+", 1, ("[]", "s", ("+", "x", "y"))),
+                ("//", ("+", "y", ("uint", -1, 1)), "z"),
+                ("+", ("uint", -1, 1), ("[]", "s", ("+", "x", "y"))),
             ),
-            32,
+            ("uint", -1, 32),
         ),
     )
 
@@ -200,14 +211,14 @@ def test_logop():
     assert b.code[-1] == (
         "connect",
         "x",
-        ("and", ("orr", "y"), ("orr", "z")),
+        ("&", ("orr", "y"), ("orr", "z")),
     )
 
     b.x = b.or_expr(b.y, b.z)
     assert b.code[-1] == (
         "connect",
         "x",
-        ("or", ("orr", "y"), ("orr", "z")),
+        ("|", ("orr", "y"), ("orr", "z")),
     )
 
     b.x = b.not_expr(b.y)
@@ -236,6 +247,9 @@ def test_bit_slicing():
     with raises(IndexError, match="Slice MSB must be equal to or larger"):
         b.y = b.x[1:3]
 
+    with raises(TypeError, match=r"Expected constant bit-slice"):
+        b.y = b.x[None]
+
 
 def test_array_indexing():
     """Test x[y] = z, x = y[z], etc"""
@@ -246,7 +260,7 @@ def test_array_indexing():
     assert b.code[-1] == ("connect", "y", ("[]", "s", "x"))
 
     b.y = b.s[1]
-    assert b.code[-1] == ("connect", "y", ("[]", "s", 1))
+    assert b.code[-1] == ("connect", "y", ("[]", "s", ("uint", -1, 1)))
 
     b.s[b.x] = b.y
     assert b.code[-1] == ("connect", ("[]", "s", "x"), "y")
@@ -254,7 +268,7 @@ def test_array_indexing():
     with raises(IndexError, match=r"s\[21\] is out of range \(size=20\)"):
         b.y = b.s[21]
 
-    with raises(TypeError, match=r"b is not an array"):
+    with raises(TypeError, match=r"is not subscriptable"):
         b.y = b.b[2]
 
 

@@ -83,3 +83,18 @@ def test_arrays():
     assert repr(a1) == "uint[3][10]"
     assert a1.size == 10
     assert a1.type == hw.uint[3]
+
+
+def test_equivalent():
+    assert hw.equivalent(hw.uint[2], hw.uint[2])
+    assert not hw.equivalent(hw.uint[2], hw.uint[3])
+    assert not hw.equivalent(hw.uint[2], hw.sint[2])
+    assert hw.equivalent(hw.uint[1][10], hw.uint[1][10])
+    assert not hw.equivalent(hw.sint[1][10], hw.uint[1][10])
+    assert not hw.equivalent(hw.uint[1][10], hw.uint[1][11])
+    assert not hw.equivalent(hw.uint[1][10], hw.uint[2][10])
+    assert hw.equivalent(hw.uint[1][10][2], hw.uint[1][10][2])
+    assert not hw.equivalent(hw.sint[1][10][2], hw.uint[1][10][2])
+    assert not hw.equivalent(hw.uint[1][10][2], hw.uint[1][10][3])
+    assert not hw.equivalent(hw.uint[1][10][2], hw.uint[1][11][2])
+    assert not hw.equivalent(hw.uint[1][10][2], hw.uint[2][10][2])

@@ -27,6 +27,10 @@ def _op3(name, argc=3, parc=0):
     return (f"{name}({{e[0]}}, {{e[1]}}, {{e[2]}})", argc, parc)
 
 
+def _int(t):
+    return (f"{t}({{e[1]}})", 1, 1)
+
+
 _op_to_func = {
     # op -> opstr, argument count, parameter count
     "+": _op2("add"),
@@ -58,6 +62,8 @@ _op_to_func = {
     "bits": _op3("bits", 1, 2),
     ".": ("{e[0]}.{e[1]}", 2, 0),
     "[]": ("{e[0]}[{e[1]}]", 2, 0),
+    "uint": _int("UInt"),
+    "sint": _int("SInt"),
 }
 
 
@@ -135,6 +141,7 @@ def _statements(module: m._Module) -> str:
 
 def _expr(x, signed=False) -> str:
     if isinstance(x, int):
+        return x
         if x >= 0 and not signed:
             return f"UInt({x})"
         else:

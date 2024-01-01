@@ -3,12 +3,14 @@ Hardware modelling types
 """
 
 from typing import Dict, Union, Callable
+from dataclasses import fields
 
 
 class _HWType:
     """Base class for all hardware modelling types"""
 
     firrtl: Callable[[], str]
+    signed: bool
 
     def __getitem__(self, size: int) -> "_Array":
         """Create array type"""
@@ -54,11 +56,20 @@ class _IntValue:
     def __repr__(self):
         return f"{self.type.type}[{self.type.size}]({self.value:#x})"
 
+    """
+    def __eq__(self, v):
+        if isinstance(v, _IntValue):
+            return (self.type is v.type) and (self.value == v.value)
+        else:
+            return self.value == v
+    """
+
 
 class _Int(_HWType):
     """Integer type base class"""
 
     type: str
+    signed: bool
     _minval: Union[int, None]
     _maxval: Union[int, None]
     _set_min_max: Callable[[int], None]
@@ -82,6 +93,7 @@ class _UInt(_Int):
     """Unsigned integer"""
 
     type = "uint"
+    signed = False
 
     def _set_min_max(self, size):
         self._minval = 0
@@ -95,6 +107,7 @@ class _SInt(_Int):
     """Signed integer"""
 
     type = "sint"
+    signed = True
 
     def _set_min_max(self, size):
         if size > 0:
@@ -170,6 +183,35 @@ class _Struct(_HWType):
 
     def __call__(self, *args, **kwargs):
         return self.dataclass(*args, **kwargs)
+
+
+def equivalent(t1, t2, sizes=True) -> bool:
+    """Check if two types are equivalent"""
+    if type(t1) != type(t2):
+        return False
+    if isinstance(t1, _Int):
+        if sizes:
+            return t1 is t2
+        else:
+            return t1.signed == t2.signed
+    if isinstance(t1, _Struct):
+        fl1 = [x for x in fields(t1.dataclass) if isinstance(x.type, _HWType)]
+        fl2 = [x for x in fields(t2.dataclass) if isinstance(x.type, _HWType)]
+        if len(fl1) != len(fl2):
+            return False
+        for f1, f2 in zip(fl1, fl2):
+            if f1.name != f2.name:
+                return False
+            if not equivalent(f1.type, f2.type):
+                return False
+        return True
+    if isinstance(t1, _Array):
+        if t1.size != t2.size:
+            return False
+        if not equivalent(t1.type, t2.type):
+            return False
+        return True
+    raise TypeError(f"Unsupported type {t1}")
 
 
 class _Direction:

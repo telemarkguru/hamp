@@ -1,5 +1,5 @@
 from hamp._struct import struct, flip, hasmember
-from hamp._hwtypes import uint, sint
+from hamp._hwtypes import uint, sint, equivalent
 import pytest
 
 
@@ -75,3 +75,91 @@ def test_array_in_struct():
     assert x.b[0].value == 1
     assert x.b[1].value == 2
     assert x.b[2].value == 3
+
+
+def test_equivalent():
+    @struct
+    class Z:
+        a: uint[10]
+        b: uint[2][3][4]
+
+    @struct
+    class Z2:
+        a: uint[10]
+        b: uint[2][1][4]
+
+    @struct
+    class A:
+        a: sint[2]
+        b: sint[4]
+        x: sint[7][7]
+        z: Z
+
+    @struct
+    class B:
+        a: sint[2]
+        b: sint[4]
+        x: sint[7][7]
+        z: Z
+
+    assert equivalent(A, B)
+
+    @struct
+    class A:
+        a: sint[2]
+        b: sint[4]
+
+    @struct
+    class B:
+        a: sint[2]
+        b: sint[4]
+        c: uint[1]
+
+    assert not equivalent(A, B)
+
+    @struct
+    class A:
+        a: sint[2]
+        b: uint[4]
+
+    @struct
+    class B:
+        a: sint[2]
+        b: sint[4]
+
+    assert not equivalent(A, B)
+
+    @struct
+    class A:
+        a: sint[2]
+        b: sint[4]
+        x: sint[7][7]
+        z: Z
+
+    @struct
+    class B:
+        a: sint[2]
+        b: sint[4]
+        x: sint[7][7]
+        z: Z2
+
+    assert not equivalent(A, B)
+
+    @struct
+    class A:
+        a: sint[2]
+        b: sint[4]
+        i: sint[7][7]
+        z: Z
+
+    @struct
+    class B:
+        a: sint[2]
+        b: sint[4]
+        x: sint[7][7]
+        z: Z2
+
+    assert not equivalent(A, B)
+
+    with pytest.raises(TypeError):
+        equivalent(1, 2)

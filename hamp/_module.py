@@ -2,7 +2,7 @@
 Code for the module class and associated features.
 """
 
-from typing import Callable, Union, Any, Dict, Iterator, TypeVar, Type
+from typing import Callable, Union, Dict, Iterator, TypeVar, Type
 from ._hwtypes import (
     _HWType,
     _Clock,
@@ -12,6 +12,10 @@ from ._hwtypes import (
     OUTPUT,
 )
 from copy import deepcopy
+
+
+AttrData = Union[str, int]
+AttrType = Dict[str, AttrData]
 
 
 modules: Dict[str, "_Module"] = {}
@@ -50,6 +54,7 @@ class _Module:
     """
 
     _VARS = set(("name", "_members"))
+    _RESERVED = set(("cat",))
 
     def __init__(self, name: str):
         """Create an empty module.
@@ -74,6 +79,8 @@ class _Module:
         if name in _Module._VARS:
             super().__setattr__(name, value)
             return
+        if name in _Module._RESERVED:
+            raise NameError(f"Name {name} is reserved")
         if not isinstance(value, _ModuleMember):
             raise TypeError(
                 f"Cannot add values of type {type(value)} to a module"
@@ -126,7 +133,7 @@ class _Module:
             if isinstance(m, type):
                 yield m
 
-    def attr(self, name) -> Any:
+    def attr(self, name: str) -> AttrData:
         """Return an value of attribute with the given name"""
         m = self._members[name]
         if not isinstance(m, _Attribute):
@@ -211,15 +218,18 @@ class _Wire(_LocalDataMember):
     """Wire module member"""
 
     type: _HWType
+    attributes: AttrType
 
-    def __init__(self, type: _HWType):
+    def __init__(self, type: _HWType, attributes: AttrType):
         self.type = type
+        self.attributes = attributes
 
 
 class _Register(_LocalDataMember):
     """State module member"""
 
     type: _HWType
+    attributes: AttrType
 
     def __init__(
         self,
@@ -227,11 +237,13 @@ class _Register(_LocalDataMember):
         clock: Union[_DataMember, None],
         reset: Union[_DataMember, None, bool],
         value: Union[int, _HWType],
+        attributes: AttrType,
     ):
         self.type = type
         self.clock = clock
         self.reset = reset
         self.value = value
+        self.attributes = attributes
 
     # TODO: Add attributes to registers to make it possible to
     # annotate CSR info to a register
@@ -286,7 +298,9 @@ class _ModuleFunc(_CodeItem):
 class _Attribute(_ModuleMember):
     """Attribute module member"""
 
-    def __init__(self, value: Any):
+    value: AttrData
+
+    def __init__(self, value: AttrData):
         self.value = value
 
 
@@ -306,9 +320,9 @@ def output(type: _HWType) -> _Port:
     return _Port(type, OUTPUT)
 
 
-def wire(type: _HWType) -> _Wire:
+def wire(type: _HWType, **attributes: AttrData) -> _Wire:
     """Create wire module member of the given type"""
-    return _Wire(type)
+    return _Wire(type, attributes)
 
 
 def register(
@@ -316,6 +330,7 @@ def register(
     clock: Union[_DataMember, None] = None,
     reset: Union[_DataMember, None, bool] = None,
     value: Union[int, _HWType] = 0,
+    **attributes: AttrData,
 ) -> _Register:
     """Create register module member of the given type.
     The clock is inferred if not specified (the first defined clock
@@ -325,10 +340,10 @@ def register(
     is not reset.
     The reset value is zero if not specified.
     """
-    return _Register(type, clock, reset, value)
+    return _Register(type, clock, reset, value, attributes)
 
 
-def attribute(value: Any):
+def attribute(value: AttrData) -> _Attribute:
     """Create attribute module member (of any type).
     Used to store meta-data that is not converted to RTL.
     """
