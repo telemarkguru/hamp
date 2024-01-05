@@ -209,3 +209,44 @@ def test_logic_expr():
             m.y = 3
 
     _generate_and_check("logexp", m)
+
+
+def test_composit_data_types():
+    modules.clear()
+
+    @struct
+    class C:
+        r: sint[32]
+        i: sint[32]
+
+    @struct
+    class Pos:
+        x: C
+        y: C
+        z: C[4]
+        g: C[4][2]
+
+    @struct
+    class R:
+        a: Pos
+        b: Pos
+        c: uint[2]
+
+    m = module("data_types")
+    m.a = input(C)
+    m.c = input(Pos)
+    m.c2 = input(Pos[2])
+    m.r = input(R)
+    m.r3 = input(R[3])
+    m.z = output(C[3])
+    m.zsel = input(uint[2])
+    m.gsel = input(uint[1])
+    m.rsel = input(uint[1])
+
+    @m.code
+    def main(m):  # pragma: no cover
+        m.z[0] = m.r3[m.rsel].a.g[m.gsel][m.zsel]
+        m.z[1] = m.r.b.z[m.zsel]
+        m.z[2] = m.c2[m.rsel].x
+
+    _generate_and_check("data_types", m)
