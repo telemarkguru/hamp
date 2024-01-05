@@ -4,16 +4,12 @@ Convert to FIRRTL
 
 from . import _module as m
 from ._generate import code
-from ._hwtypes import _IntValue, _Reset, _Clock
+from ._hwtypes import _Reset, _Clock
 from ._hwtypes_firrtl import apply
 from typing import Union
 
 
 apply()
-
-
-def _d_if_not_int(x):
-    return "d" if not isinstance(x, int) else ""
 
 
 def _op1(name, argc=1, parc=0):
@@ -143,8 +139,6 @@ def _statements(module: m._Module) -> str:
 def _expr(x, signed=False) -> Union[str, int]:
     if isinstance(x, int):
         return x
-    if isinstance(x, _IntValue):
-        return x.firrtl()
     if not isinstance(x, (tuple, list)):
         return str(x)
     op = x[0]
@@ -158,9 +152,9 @@ def _expr(x, signed=False) -> Union[str, int]:
         return f"else when {_expr(x[1])} :"
     elif op == "end_when":
         return ""
-    elif op in ("<<", ">>") and isinstance(x[2], int):
+    elif op in ("<<", ">>") and isinstance(x[2], tuple) and x[2][0] == "uint":
         opstr, _, _ = _op_to_func[f"{op}k"]
-        return opstr.format(e=[_expr(x[1]), x[2]])
+        return opstr.format(e=[_expr(x[1]), x[2][2]])
     else:
         opstr, argc, parc = _op_to_func[op]
         e = [_expr(z) if i < argc else z for i, z in enumerate(x[1:])]

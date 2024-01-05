@@ -1,4 +1,4 @@
-from hamp._struct import struct, flip, hasmember
+from hamp._struct import struct, flip, hasmember, members
 from hamp._hwtypes import uint, sint, equivalent
 import pytest
 
@@ -38,6 +38,8 @@ def test_hier_struct():
     assert x.b.b.value == 0
     x.b.a = uint[3](7)
     assert x.b.a.value == 7
+
+    assert list(members(Foo)) == [("a", sint[1]), ("b", uint[3])]
 
 
 def test_flip():

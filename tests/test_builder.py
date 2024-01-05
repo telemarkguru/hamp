@@ -21,13 +21,18 @@ class B:
 
 def _setup():
     modules.clear()
+    mi = module("inst")
+    mi.w = wire(sint[2])
+    mi.i = input(uint[2])
     m = module("mod")
     m.x = output(uint[11])
     m.xs = output(sint[11])
     m.y = input(uint[10])
     m.z = wire(uint[10])
     m.s = wire(uint[10][20])
+    m.s2 = wire(uint[10][20][2])
     m.b = wire(B)
+    m.inst = mi()
     b = _CodeBuilder(m)
     return b
 
@@ -120,11 +125,17 @@ def test_op2():
     b.x = 11 >> b.z
     chk(">>", v0=11)
 
+    b.x = b.y >> 11
+    chk(">>", v1=11)
+
     b.x = b.y << b.z
     chk("<<")
 
     b.x = 3 << b.z
     chk("<<", v0=3)
+
+    b.x = b.y << 3
+    chk("<<", v1=3)
 
     b.x = b.y | b.z
     chk("|")
@@ -180,6 +191,12 @@ def test_op2():
     b.x = b.cat(b.y, b.z)
     chk("cat")
 
+    b.b.e = b.cvt(b.x)
+    assert b.code[-1] == ("connect", (".", "b", "e"), ("cvt", "x"))
+
+    b.b.e = b.cvt(b.b.e)
+    assert b.code[-1] == ("connect", (".", "b", "e"), ("cvt", (".", "b", "e")))
+
 
 def test_expressions():
     """Test nested expressions"""
@@ -223,6 +240,9 @@ def test_logop():
 
     b.x = b.not_expr(b.y)
     assert b.code[-1] == ("connect", "x", ("not", ("orr", "y")))
+
+    b.x = b.and_expr(b.y, 10)
+    assert b.code[-1] == ("connect", "x", ("&", ("orr", "y"), ("uint", 1, 1)))
 
 
 def test_bit_slicing():
@@ -271,6 +291,10 @@ def test_array_indexing():
     with raises(TypeError, match=r"is not subscriptable"):
         b.y = b.b[2]
 
+    b.s[b.x] = 3
+
+    b.s2[1] = b.s2[0]
+
 
 def test_struct_member_access():
     """Test x.a, a.b.c etc"""
@@ -278,6 +302,43 @@ def test_struct_member_access():
     b = _setup()
 
     b.b.c.a = b.b.d.b
+    b.b.c.a = 1
 
     with raises(AttributeError, match=r"has no member bix"):
         b.b.c.bix
+
+
+def test_instance_port_access():
+    b = _setup()
+
+    b.inst.i = 3
+
+
+def test_assign_type_checking():
+    b = _setup()
+    with raises(TypeError, match="Cannot assign non-equivalent"):
+        b.b = b.b.c
+    with raises(AttributeError, match="Module mod has no member nada"):
+        b.nada = 1
+    with raises(AttributeError, match="Module mod has no member nada"):
+        b.b = b.nada
+    with raises(AttributeError, match="Module inst has no member nada"):
+        b.inst.nada = 1
+    with raises(AttributeError, match="Module inst has no member nada"):
+        b.b = b.inst.nada
+    with raises(TypeError, match="Cannot access w in instance of inst"):
+        b.b = b.inst.w
+    with raises(TypeError, match="Cannot infer integer for type"):
+        b.b = 3
+    with raises(TypeError, match="Both operands must have same sign"):
+        b.b.e + b.b.d.b
+    with raises(TypeError, match="Shift amount must be an unsigned value"):
+        b.b.d.b << b.b.e
+    with raises(TypeError, match="Shift amount must be an unsigned value"):
+        b.b.d.b >> b.b.e
+    with raises(TypeError, match="Cannot assign non-equivalent type"):
+        b.b.c = b.y
+    with raises(TypeError, match="Cannot assign non-equivalent type"):
+        b.s[3] = b.b.c
+    with raises(TypeError, match="Cannot assign non-equivalent type"):
+        b.inst.w = b.b.c

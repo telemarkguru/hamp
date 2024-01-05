@@ -108,6 +108,7 @@ def test_ops():
     m.d = input(sint[8])
     m.x = output(uint[9][2])
     m.y = output(sint[9][2])
+    m.z = output(sint[9][2])
 
     @m.code
     def main(x):  # pragma: no cover
@@ -115,6 +116,8 @@ def test_ops():
         x.x[1] = x.a << x.b
         x.y[0] = x.c >> x.b
         x.y[1] = x.c << x.b
+        x.z[0] = x.c << 3
+        x.z[1] = x.c >> 2
 
     _generate_and_check("ops", m)
 
@@ -195,7 +198,7 @@ def test_logic_expr():
     m.y = output(uint[3])
 
     @m.code
-    def main(m):
+    def main(m):  # pragma: no cover
         m.x = m.a and m.b and m.c
         m.y = 0
         if not m.a:

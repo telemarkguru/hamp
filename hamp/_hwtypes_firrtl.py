@@ -18,10 +18,10 @@ def _flip(s, m):
 
 
 def apply():
-    @_apply(hw._HWType)
-    def firrtl(self) -> str:
-        assert False
-        return ""
+    # @_apply(hw._HWType)
+    # def firrtl(self) -> str:
+    #     assert False
+    #     return ""
 
     @_apply(hw._Clock)
     def firrtl(self) -> str:

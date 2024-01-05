@@ -41,7 +41,7 @@ class _Expr:
         else:
             return uint[size]
 
-    def expr(self):
+    def expr(self):  # pragma: no cover
         assert False
 
     def _chk_slice(self, slice):
@@ -115,16 +115,16 @@ class _Expr:
         return _NotExpr(self)
 
     def __lshift__(self, value: OpType) -> "_Expr":
-        return _LShiftExpr(self, value)
+        return _LShiftExpr(self, value, False)
 
     def __rlshift__(self, value: OpType) -> "_Expr":
-        return _LShiftExpr(value, self)
+        return _LShiftExpr(value, self, False)
 
     def __rshift__(self, value: OpType) -> "_Expr":
-        return _RShiftExpr(self, value)
+        return _RShiftExpr(self, value, False)
 
     def __rrshift__(self, value: OpType) -> "_Expr":
-        return _RShiftExpr(value, self)
+        return _RShiftExpr(value, self, False)
 
     def __neg__(self) -> "_Expr":
         return _NegExpr(self)
@@ -202,7 +202,7 @@ class _TwoOpExpr(_Expr):
     v1: _Expr
     v2: _Expr
 
-    def __init__(self, v1: OpType, v2: OpType):
+    def __init__(self, v1: OpType, v2: OpType, v2signed=None):
         assert isinstance(v1, (int, _Expr))
         assert isinstance(v2, (int, _Expr))
         if isinstance(v1, _Expr):
@@ -214,6 +214,8 @@ class _TwoOpExpr(_Expr):
         if isinstance(v1, int):
             self.v1 = _ConstExpr(v1, s2)
         elif isinstance(v2, int):
+            if v2signed is not None:
+                s1 = v2signed
             self.v2 = _ConstExpr(v2, s1)
         self.check_types()
         super().__init__(self.infer_type())
@@ -228,7 +230,7 @@ class _TwoOpExpr(_Expr):
                 f"{self.op}: {self.v1.type} {self.v2.type}"
             )
 
-    def infer_type(self):
+    def infer_type(self):  # pragma: no cover
         assert False
 
 
@@ -398,8 +400,8 @@ class _OneOpExpr(_Expr):
         t = self.infer_type()
         super().__init__(t)
 
-    def infer_type(self) -> _Int:
-        return self.v1.type
+    def infer_type(self) -> _Int:  # pragma: no cover
+        assert False
 
     def expr(self):
         return (self.op, self.v1.expr())
@@ -586,10 +588,10 @@ class _InstanceVar(_Var):
                 f"Module {self.type.name} has no member {name}"
             )
         item = self.type[name]
-        if isinstance(item, _module._DataMember):
+        if isinstance(item, _module._Port):
             return _vartype(item.type, name, self._builder, self)
         raise TypeError(
-            f"Cannot access {name} in instance of {self.type.type.name}"
+            f"Cannot access {name} in instance of {self.type.name}"
         )
 
     def __setattr__(self, name: str, value: Union[_Expr, int]):
@@ -645,7 +647,7 @@ CodeListItemType = Tuple[Any, ...]
 class _CodeBuilder:
     """Represents a module when generating code"""
 
-    _VARS = set(("module", "code", "cat"))
+    _VARS = set(("module", "code", "cat", "cvt"))
 
     def __init__(self, module: _module._Module):
         self.module = module
@@ -663,7 +665,7 @@ class _CodeBuilder:
             return self.module[name]
         if isinstance(item, _module._DataMember):
             return _vartype(item.type, name, self, None)
-        return False
+        return False  # pragma: no cover
 
     def __setattr__(self, name: str, value) -> None:
         """Assign value"""
@@ -748,3 +750,6 @@ class _CodeBuilder:
 
     def cat(self, *ops):
         return _reduce2(_CatExpr, *ops)
+
+    def cvt(self, op):
+        return _CvtExpr(op)
