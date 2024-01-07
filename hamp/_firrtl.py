@@ -130,10 +130,27 @@ def _items(module: m._Module, *types) -> str:
 
 def _statements(module: m._Module) -> str:
     cb = code(module)
-    lines = [(indent, _expr(x)) for x, indent in cb.iter_with_indent()]
-    return "\n    ".join(
-        f"{' ' * (indent*4)}{expr}" for indent, expr in lines if expr
-    )
+    lines: list[str] = []
+
+    def f(code, indent=""):
+        for c in code:
+            match c:
+                case ("when", expr, statements):
+                    lines.append(f"{indent}when {_expr(expr)} :")
+                    f(statements, indent + "    ")
+                case ("else-when", expr, statements):
+                    lines.append(f"{indent}else when {_expr(expr)} :")
+                    f(statements, indent + "    ")
+                case ("else", statements):
+                    lines.append(f"{indent}else :")
+                    f(statements, indent + "    ")
+                case ("connect", target, value):
+                    lines.append(f"{indent}{_expr(target)} <= {_expr(value)}")
+                case _:  # pragma: no cover
+                    assert False
+
+    f(cb.code, "    ")
+    return ("\n".join(x for x in lines if x.strip())).lstrip()
 
 
 def _expr(x, signed=False) -> Union[str, int]:
@@ -142,17 +159,7 @@ def _expr(x, signed=False) -> Union[str, int]:
     if not isinstance(x, (tuple, list)):
         return str(x)
     op = x[0]
-    if op == "connect":
-        return f"{_expr(x[1])} <= {_expr(x[2])}"
-    elif op == "when":
-        return f"when {_expr(x[1])} :"
-    elif op == "else":
-        return "else :"
-    elif op == "else_when":
-        return f"else when {_expr(x[1])} :"
-    elif op == "end_when":
-        return ""
-    elif op in ("<<", ">>") and isinstance(x[2], tuple) and x[2][0] == "uint":
+    if op in ("<<", ">>") and isinstance(x[2], tuple) and x[2][0] == "uint":
         opstr, _, _ = _op_to_func[f"{op}k"]
         return opstr.format(e=[_expr(x[1]), x[2][2]])
     else:

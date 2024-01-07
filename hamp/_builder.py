@@ -17,9 +17,6 @@ from ._hwtypes import (
 from ._struct import member
 
 
-ExprType = Union[str, int, "_Var"]
-ExprRType = Union[str, int, tuple["ExprRType", ...]]
-
 OpType = Union["_Expr", int]
 
 
@@ -640,7 +637,6 @@ def _logic_value(value: OpType) -> OpType:
     return _ConstExpr(int(bool(value)), False, 1)
 
 
-# CodeListItemType = Tuple[str, Unpack[Tuple[ExprRType, ...]]]
 CodeListItemType = Tuple[Any, ...]
 
 
@@ -687,58 +683,66 @@ class _CodeBuilder:
             )
         self.code.append(("connect", name, value.expr()))
 
-    def iter_with_indent(self):
-        indent = 0
-
-        for c in self.code:
-            if c[0] == "end_when":
-                indent -= 1
-                yield c, indent
-            elif c[0] == "when":
-                yield c, indent
-                indent += 1
-            elif c[0] in ("else_when", "else"):
-                indent -= 1
-                yield c, indent
-                indent += 1
-            else:
-                yield c, indent
-
     def __str__(self) -> str:
         text = []
-        for c, indent in self.iter_with_indent():
-            text.append(f"{' ' * (indent*4)}{c}")
+
+        def f(code, indent=""):
+            for c in code:
+                match c:
+                    case ("when", expr, stmnts):
+                        text.append(f"{indent}('when', {expr}, (")
+                        f(stmnts, indent + "    ")
+                        text.append(f"{indent}))")
+                    case ("else-when", expr, stmnts):
+                        text.append(f"{indent}('else-when', {expr}, (")
+                        f(stmnts, indent + "    ")
+                        text.append(f"{indent}))")
+                    case ("else", stmnts):
+                        text.append(f"{indent}('else', (")
+                        f(stmnts, indent + "    ")
+                        text.append(f"{indent}))")
+                    case _:
+                        text.append(f"{indent}{c}")
+
+        f(self.code)
         return "\n".join(text)
 
     @contextmanager
     def if_stmt(self, expr):
-        self.code.append(("when", _logic_value(expr).expr()))
+        code = self.code
+        self.code = []
         try:
             yield None
         finally:
-            self.code.append(("end_when",))
+            code.append(("when", _logic_value(expr).expr(), tuple(self.code)))
+            self.code = code
 
     @contextmanager
     def elif_stmt(self, expr):
-        assert self.code[-1] == ("end_when",)
-        self.code[-1] = ("else_when", _logic_value(expr).expr())
+        assert self.code[-1][0] in ("when", "else-when")
+        code = self.code
+        self.code = []
         try:
             yield None
         finally:
-            self.code.append(("end_when",))
+            code.append(
+                ("else-when", _logic_value(expr).expr(), tuple(self.code))
+            )
+            self.code = code
 
     @contextmanager
     def else_stmt(self):
-        assert self.code[-1] == ("end_when",)
-        self.code[-1] = ("else",)
+        assert self.code[-1][0] in ("when", "else-when")
+        code = self.code
+        self.code = []
         try:
             yield None
         finally:
-            self.code.append(("end_when",))
+            code.append(("else", tuple(self.code)))
+            self.code = code
 
     def and_expr(self, *ops):
         ops2 = [_logic_value(x) for x in ops]
-        print("ops2", [(x.expr(), x.type) for x in ops2])
         return _reduce2(_AndExpr, *ops2)
 
     def or_expr(self, *ops):
@@ -749,7 +753,9 @@ class _CodeBuilder:
         return _NotExpr(_logic_value(op))
 
     def cat(self, *ops):
+        """Concatenate bits"""
         return _reduce2(_CatExpr, *ops)
 
     def cvt(self, op):
+        """Convert to signed"""
         return _CvtExpr(op)

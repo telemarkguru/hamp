@@ -51,15 +51,19 @@ def test_code_builder():
         b.x = 0
 
     assert b.code == [
+        # fmt: off
         ("connect", "x", ("uint", 11, 3)),
         ("connect", "x", ("+", "y", "z")),
-        ("when", ("==", "y", "z")),
-        ("connect", "x", ("uint", 11, 7)),
-        ("else_when", (">", "y", "z")),
-        ("connect", "x", ("uint", 11, 10)),
-        ("else",),
-        ("connect", "x", ("uint", 11, 0)),
-        ("end_when",),
+        ("when", ("==", "y", "z"), (
+            ("connect", "x", ("uint", 11, 7)),
+        )),
+        ("else-when", (">", "y", "z"), (
+            ("connect", "x", ("uint", 11, 10)),
+        )),
+        ("else", (
+            ("connect", "x", ("uint", 11, 0)),
+        )),
+        # fmt: on
     ]
 
     assert (
@@ -68,13 +72,15 @@ def test_code_builder():
             """
         ('connect', 'x', ('uint', 11, 3))
         ('connect', 'x', ('+', 'y', 'z'))
-        ('when', ('==', 'y', 'z'))
+        ('when', ('==', 'y', 'z'), (
             ('connect', 'x', ('uint', 11, 7))
-        ('else_when', ('>', 'y', 'z'))
+        ))
+        ('else-when', ('>', 'y', 'z'), (
             ('connect', 'x', ('uint', 11, 10))
-        ('else',)
+        ))
+        ('else', (
             ('connect', 'x', ('uint', 11, 0))
-        ('end_when',)
+        ))
     """
         ).strip()
     )
