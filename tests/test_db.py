@@ -24,7 +24,10 @@ def _create_db():
             "foo": {
                 "foo": {},
                 "bar": {
-                    "ports": [],
+                    "ports": [
+                        ("pi", "input", ("uint", 2)),
+                        ("po", "output", ("sint", 10)),
+                    ],
                     "wires": [
                         ("a", ("uint", 2)),
                         ("x", ("uint", 1)),
@@ -52,6 +55,10 @@ def _create_db():
                     ],
                     "wires": [],
                     "registers": [],
+                    "instances": [
+                        ("i0", "foo", "bar"),
+                        ("i1", "foo", "baz"),
+                    ],
                     "code": [],
                 },
             },
@@ -200,7 +207,7 @@ def test_validate_var():
         ok["code"] = [("connect", (("uint", 4), "nope"), (("uint", 4), 1))]
         validate(db)
     with raises(
-        ValueError, match="Inconsistent type ('uint' 4) != ('uint', 7)"
+        ValueError, match=r"Inconsistent type \('uint', 4\) != \('uint', 7\)"
     ):
         ok["code"] = [("connect", (("uint", 7), "z"), (("uint", 4), 1))]
         validate(db)
@@ -305,5 +312,59 @@ def test_validate_values():
     ):
         ok["code"] = [
             ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [3.2] * 3}})),
+        ]
+        validate(db)
+
+
+def test_validate_instances():
+    db = _create_db()
+    ok = db["circuits"]["foo"]["ok"]
+    ok["code"] = [
+        (
+            "connect",
+            (("uint", 2), (".", "instance", "i0", "pi")),
+            (("uint", 2), 0),
+        ),
+        (
+            "connect",
+            (("sint", 10), "p2"),
+            (("sint", 10), (".", "instance", "i0", "po")),
+        ),
+    ]
+    validate(db)
+    with raises(
+        ValueError, match="Inconsistent input port type.*for foo::bar.pi"
+    ):
+        ok["code"] = [
+            (
+                "connect",
+                (("uint", 3), (".", "instance", "i0", "pi")),
+                (("uint", 2), 0),
+            ),
+        ]
+        validate(db)
+    with raises(ValueError, match="Module foo::bar has no port nix"):
+        ok["code"] = [
+            (
+                "connect",
+                (("uint", 2), (".", "instance", "i0", "nix")),
+                (("uint", 2), 0),
+            ),
+        ]
+        validate(db)
+    with raises(ValueError, match="No module named foo::z found"):
+        ok["instances"] = [("z", "foo", "z")]
+        validate(db)
+    with raises(ValueError, match="Malformed instance entry in module ok"):
+        ok["instances"] = [("z", "foo")]
+        validate(db)
+    with raises(ValueError, match="Module ok has no instance wefop"):
+        ok["instances"] = []
+        ok["code"] = [
+            (
+                "connect",
+                (("uint", 2), (".", "instance", "wefop", "pi")),
+                (("uint", 2), 0),
+            ),
         ]
         validate(db)
