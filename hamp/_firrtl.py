@@ -2,14 +2,7 @@
 Convert to FIRRTL
 """
 
-from . import _module as m
-from ._generate import code
-from ._hwtypes import _Reset, _Clock
-from ._hwtypes_firrtl import apply
-from typing import Union
-
-
-apply()
+from ._db import DB
 
 
 def _op1(name, argc=1, parc=0):
@@ -57,81 +50,76 @@ _op_to_func = {
     "xorr": _op1("xorr"),
     "cat": _op2("cat"),
     "bits": _op3("bits", 1, 2),
-    ".": ("{e[0]}.{e[1]}", 2, 0),
+    ".": ("{e[0]}.{e[1]}", 1, 1),
     "[]": ("{e[0]}[{e[1]}]", 2, 0),
     "uint": _int("UInt"),
     "sint": _int("SInt"),
 }
 
 
-def _genfunc(*types):
-    """Decorator to create code generator function for type"""
-
-    def f(func):
-        for type in types:
-            type._firrtl_code = func
-
-    return f
-
-
-@_genfunc(m._Port)
-def _port(p: m._Port) -> str:
-    return f"{p.direction.name} {p.name} : {p.type.firrtl()}"
-
-
-@_genfunc(m._Wire)
-def _wire(w: m._Wire) -> str:
-    return f"wire {w.name} : {w.type.firrtl()}"
-
-
-@_genfunc(m._Register)
-def _register(r: m._Register) -> str:
-    type = r.type.firrtl()
-    if isinstance(r.reset, m._DataMember):
-        assert isinstance(r.reset.type, _Reset)
-        reset = f" with: (reset => ({r.reset.name}, {type}({r.value})))"
-    else:
-        reset = ""
-    assert isinstance(r.clock, m._DataMember)
-    assert isinstance(r.clock.type, _Clock)
-    return f"reg {r.name} : {type}, {r.clock.name}{reset}"
-
-
-@_genfunc(m._Instance)
-def _instance(m: m._Instance) -> str:
-    return f"inst {m.name} of {m.module.name}"
-
-
-def _preamble(name: str, version: str = "1.1.0") -> str:
+def _preamble(version: str = "1.1.0") -> str:
     """Return FIRRTL header"""
-    return f"FIRRTL version {version}\ncircuit {name} :\n"
+    return f"FIRRTL version {version}"
 
 
-def _module(module: m._Module, prefix: str = "") -> str:
-    """Generate and return FIRRTL code for module"""
-    ports = _items(module, m._Port)
-    data = _items(module, m._LocalDataMember)
-    statements = _statements(module)
-    return (
-        "\n"
-        f"  {prefix}module {module.name} :\n"
-        f"    {ports}\n"
-        "\n"
-        f"    {data}\n"  # Wires, registers and instances
-        "\n"
-        f"    {statements}\n"
-    )
+def _expr(x: tuple) -> str:
+    t, v = x
+    match v:
+        case str(v):
+            return v
+        case int(v):
+            return f"{_type(t)}({v})"
+        case (".", "instance", str(iname), str(pname)):
+            return f"{iname}.{pname}"
+        case (str(op), *args):
+            if op in ("<<", ">>") and isinstance(args[1][1], int):
+                opstr, _, _ = _op_to_func[f"{op}k"]
+                return opstr.format(e=[_expr(args[0]), args[1][1]])
+            else:
+                opstr, argc, parc = _op_to_func[op]
+                e = [_expr(z) if i < argc else z for i, z in enumerate(args)]
+                f = opstr.format(e=e)
+                return f
+        case _:  # pragma: no cover
+            assert False, f"t={t},  v={v}"
 
 
-def _items(module: m._Module, *types) -> str:
-    """Generate code for item"""
-    return "\n    ".join(x._firrtl_code() for x in module._iter_types(*types))
+def _type(t: tuple) -> str:
+    match t:
+        case ("uint", int(size)):
+            if size > 0:
+                return f"UInt<{size}>"
+            return "UInt"
+        case ("sint", int(size)):
+            if size > 0:
+                return f"SInt<{size}>"
+            return "SInt"
+        case ("array", int(size), at):
+            return f"{_type(at)}[{size}]"
+        case ("struct", *fields):
+            return "{" + ", ".join(_type_field(*f) for f in fields) + "}"
+        case ("clock", 1):
+            return "Clock"
+        case ("async_reset", 1):
+            return "AsyncReset"
+        case ("sync_reset", 1):
+            return "SyncReset"
+        case _:  # pragma no cover
+            assert False, f"t={t}"
 
 
-def _statements(module: m._Module) -> str:
-    cb = code(module)
-    lines: list[str] = []
+def _type_field(name: str, type: tuple, flip) -> str:
+    flip = "flip " if flip else ""
+    return f"{flip}{name}: {_type(type)}"
 
+
+def _reset(reset, type) -> str:
+    if reset == 0:
+        return ""
+    return f" with: (reset => ({reset[0]}, {_expr((type, reset[1]))}))"
+
+
+def _statements(code: list[tuple], lines: list[str]) -> None:
     def f(code, indent=""):
         for c in code:
             match c:
@@ -149,30 +137,42 @@ def _statements(module: m._Module) -> str:
                 case _:  # pragma: no cover
                     assert False
 
-    f(cb.code, "    ")
-    return ("\n".join(x for x in lines if x.strip())).lstrip()
+    f(code, "    ")
 
 
-def _expr(x, signed=False) -> Union[str, int]:
-    if isinstance(x, int):
-        return x
-    if not isinstance(x, (tuple, list)):
-        return str(x)
-    op = x[0]
-    if op in ("<<", ">>") and isinstance(x[2], tuple) and x[2][0] == "uint":
-        opstr, _, _ = _op_to_func[f"{op}k"]
-        return opstr.format(e=[_expr(x[1]), x[2][2]])
-    else:
-        opstr, argc, parc = _op_to_func[op]
-        e = [_expr(z) if i < argc else z for i, z in enumerate(x[1:])]
-        f = opstr.format(e=e)
-        return f
+def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
+    """Generate FIRRTL code for module"""
+    lines += ["", f"  module {mname} :"]
+    m = db["circuits"][cname][mname]
+    for p in m["ports"]:
+        lines.append(f"    {p[1]} {p[0]} : {_type(p[2])}")
+    lines.append("")
+    for w in m["wires"]:
+        lines.append(f"    wire {w[0]} : {_type(w[1])}")
+    for r in m["registers"]:
+        lines.append(
+            f"    reg {r[0]} : {_type(r[1])}, {r[2]}{_reset(r[3], r[1])}"
+        )
+    for i in m["instances"]:
+        lines.append(f"    inst {i[0]} of {i[2]}")
+    lines.append("")
+    _statements(m["code"], lines)
+    lines.append("")
 
 
-def generate(*modules):
+def _circuit(name: str, db: DB, lines: list[str]) -> None:
+    lines.append(f"circuit {name} :")
+    modules = db["circuits"][name]
+    for mname in modules:
+        _module(name, mname, db, lines)
+
+
+def generate(db: DB) -> str:
     """
-    Generate and return FIRRTL code for given modules.
-    First module is public, the rest are private
+    Generate and return FIRRTL code for given database (intermediate format).
     """
-    name = modules[0].name
-    return _preamble(name) + "\n".join((_module(x) for x in modules))
+    lines = [_preamble()]
+    circuits = db["circuits"]
+    for name in circuits:
+        _circuit(name, db, lines)
+    return "\n".join(lines)

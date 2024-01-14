@@ -12,7 +12,6 @@ circuit data_types :
     input gsel : UInt<1>
     input rsel : UInt<1>
 
-    
 
     z[UInt(0)] <= r3[rsel].a.g[gsel][zsel]
     z[UInt(1)] <= r.b.z[zsel]

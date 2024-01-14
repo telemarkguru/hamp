@@ -8,6 +8,5 @@ circuit index :
     output z : UInt<18>
     input b : SInt<10>
 
-    
 
     z <= cat(a[x][y], b)

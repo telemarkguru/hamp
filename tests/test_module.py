@@ -7,8 +7,8 @@ def test_create_module():
     mod.modules.clear()
     m = mod.module("name")
     assert isinstance(m, mod._Module)
-    assert m.name == "name"
-    with pytest.raises(NameError, match=r"Redefinition of module name"):
+    assert m.name == "name::name"
+    with pytest.raises(NameError, match=r"Redefinition of module name::name"):
         mod.module("name")
 
 
@@ -18,7 +18,7 @@ def test_clone_module():
     m.x = mod.input(uint[1])
     m.y = mod.wire(uint[2])
     m.clone("name2")
-    assert list(mod.modules.keys()) == ["name", "name2"]
+    assert list(mod.modules.keys()) == [("name::name"), ("name2::name2")]
 
 
 def test_member_access_module():
@@ -38,21 +38,21 @@ def test_member_access_module():
 
 def test_module_instance():
     mod.modules.clear()
-    sm = mod.module("submodule")
+    sm = mod.module("module::submodule")
     sm.a = mod.wire(sint[2])
     sm.p = mod.output(uint[1000])
     sm.clk = mod.input(uint[1])
     m = mod.module("module")
     m.i = sm()
     assert isinstance(m.i.p, mod._Port)
-    m.j = mod.instance("submodule")
-    with pytest.raises(NameError, match="No module named higgins defined"):
-        m.k = mod.instance("higgins")
+    m.j = mod.instance("module::submodule")
+    with pytest.raises(NameError, match="No module named h::higgins defined"):
+        m.k = mod.instance("h::higgins")
     assert isinstance(m["i"], mod._Instance)
     assert "k" not in m
     assert "j" in m
     with pytest.raises(
-        TypeError, match="Member a of module submodule is not a port"
+        TypeError, match="Member a of module module::submodule is not a port"
     ):
         m.j.a
 
@@ -122,7 +122,7 @@ def test_unique_module_name():
     mod.modules.clear()
     mod.module("foo")
     m2 = mod.module(mod.unique("foo"))
-    assert m2.name == "foo_1"
+    assert m2.name == "foo::foo_1"
 
 
 def test_module_add_bad_type():

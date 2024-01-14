@@ -1,8 +1,19 @@
 """Code builder"""
 
 from contextlib import contextmanager
-from typing import Union, Tuple, List, Any, Type
-from . import _module
+from typing import Union, Tuple, List, Any, Type, Sequence
+from ._module import (
+    _Module,
+    _ModuleMember,
+    _DataMember,
+    _ModuleCode,
+    _ModuleFunc,
+    _Instance,
+    _Port,
+    _Wire,
+    _Register,
+)
+
 from ._hwtypes import (
     _Struct,
     _Int,
@@ -13,8 +24,11 @@ from ._hwtypes import (
     sint,
     _IntValue,
     equivalent,
+    INPUT,
+    OUTPUT,
 )
 from ._struct import member
+from ._convert import convert
 
 
 OpType = Union["_Expr", int]
@@ -168,7 +182,7 @@ class _ConstExpr(_Expr):
 
     def expr(self):
         t = self.value.type
-        return (t.type, t.size, self.value.value)
+        return (t.expr(), self.value.value)
 
 
 def _infer_int(type, value) -> _Expr:
@@ -191,7 +205,10 @@ class _BitsExpr(_Expr):
         self.v1 = v1
 
     def expr(self):
-        return (self.op, self.v1.expr(), self.start, self.stop)
+        return (
+            self.type.expr(),
+            (self.op, self.v1.expr(), self.start, self.stop),
+        )
 
 
 class _TwoOpExpr(_Expr):
@@ -218,7 +235,7 @@ class _TwoOpExpr(_Expr):
         super().__init__(self.infer_type())
 
     def expr(self):
-        return (self.op, self.v1.expr(), self.v2.expr())
+        return (self.type.expr(), (self.op, self.v1.expr(), self.v2.expr()))
 
     def check_types(self):
         if self.v1.type.signed != self.v2.type.signed:
@@ -401,7 +418,7 @@ class _OneOpExpr(_Expr):
         assert False
 
     def expr(self):
-        return (self.op, self.v1.expr())
+        return (self.type.expr(), (self.op, self.v1.expr()))
 
 
 class _CvtExpr(_OneOpExpr):
@@ -464,7 +481,7 @@ class _IntVarExpr(_Expr, _Var):
     def expr(self, _=None):
         if self._base:
             return self._base.expr(self._name)
-        return self._name
+        return (self.type.expr(), self._name)
 
 
 class _StructVar(_Var):
@@ -502,10 +519,11 @@ class _StructVar(_Var):
         if not name:
             if self._base:
                 return self._base.expr(self._name)
-            return self._name
+            return (self.type.expr(), self._name)
+        item = member(self.type, name).expr()
         if self._base:
-            return (".", self._base.expr(self._name), name)
-        return (".", self._name, name)
+            return (item, (".", self._base.expr(self._name), name))
+        return (item, (".", (self.type.expr(), self._name), name))
 
 
 class _ArrayVar(_Var):
@@ -554,24 +572,25 @@ class _ArrayVar(_Var):
 
     def expr(self, _=None):
         if self._base:
-            if self.idx is None:
-                return self._base.expr(self._name)
-            else:
-                return ("[]", self._base.expr(self._name), self.idx.expr())
+            t, b = self._base.expr(self._name)
         else:
-            if self.idx is None:
-                return self._name
-            else:
-                return ("[]", self._name, self.idx.expr())
+            t = self.type.expr()
+            b = self._name
+        if self.idx is not None:
+            i = self.idx.expr()
+            rt = self.type.type.expr()
+            return (rt, ("[]", (t, b), i))
+        else:
+            return (t, b)
 
 
 class _InstanceVar(_Var):
     _VARS = set(("_name", "type", "_builder", "_base"))
-    type: _module._Module
+    type: _Module
 
     def __init__(
         self,
-        type: _module._Module,
+        type: _Module,
         name: str,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
@@ -585,7 +604,7 @@ class _InstanceVar(_Var):
                 f"Module {self.type.name} has no member {name}"
             )
         item = self.type[name]
-        if isinstance(item, _module._Port):
+        if isinstance(item, _Port):
             return _vartype(item.type, name, self._builder, self)
         raise TypeError(
             f"Cannot access {name} in instance of {self.type.name}"
@@ -600,7 +619,7 @@ class _InstanceVar(_Var):
                 f"Module {self.type.name} has no member {name}"
             )
         item = self.type[name]
-        assert isinstance(item, _module._DataMember)
+        assert isinstance(item, _DataMember)
         # TODO: check that member is (part of) output, wire or register
         if isinstance(value, int):
             value = _infer_int(item.type, value)
@@ -611,7 +630,8 @@ class _InstanceVar(_Var):
         self._builder.code.append(("connect", self.expr(name), value.expr()))
 
     def expr(self, name):
-        return (".", self._name, name)
+        item = self.type[name]
+        return (item.type, (".", "instance", self._name, name))
 
 
 def _vartype(type, name, builder, base) -> _Var:
@@ -619,7 +639,7 @@ def _vartype(type, name, builder, base) -> _Var:
         return _StructVar(type, name, builder, base)
     elif isinstance(type, _Array):
         return _ArrayVar(type, name, builder, base)
-    elif isinstance(type, _module._Module):
+    elif isinstance(type, _Module):
         return _InstanceVar(type, name, builder, base)
     return _IntVarExpr(type, name, builder, base)
 
@@ -645,21 +665,19 @@ class _CodeBuilder:
 
     _VARS = set(("module", "code", "cat", "cvt"))
 
-    def __init__(self, module: _module._Module):
+    def __init__(self, module: _Module):
         self.module = module
         self.code: List[CodeListItemType] = []
 
-    def __getattr__(
-        self, name: str
-    ) -> Union[_Var, _module._ModuleMember, bool]:
+    def __getattr__(self, name: str) -> Union[_Var, _ModuleMember, bool]:
         if name not in self.module:
             raise AttributeError(
                 f"Module {self.module.name} has no member {name}"
             )
         item = self.module[name]
-        if isinstance(item, _module._ModuleFunc):
+        if isinstance(item, _ModuleFunc):
             return self.module[name]
-        if isinstance(item, _module._DataMember):
+        if isinstance(item, _DataMember):
             return _vartype(item.type, name, self, None)
         return False  # pragma: no cover
 
@@ -673,15 +691,22 @@ class _CodeBuilder:
                 f"Module {self.module.name} has no member {name}"
             )
         item = self.module[name]
-        assert isinstance(item, _module._DataMember)
-        # TODO: check that member is (part of) output, wire or register
+        if not isinstance(item, _DataMember):
+            raise TypeError(
+                f"Cannot assign value of unsupported type: {value}"
+            )
+        if isinstance(item, _Port):
+            if item.direction != OUTPUT:
+                raise TypeError(f"Cannot assign to input {name}")
+        elif isinstance(item, _Instance):
+            raise TypeError(f"Cannot assign to instance {name}")
         if isinstance(value, int):
             value = _infer_int(item.type, value)
         if not equivalent(value.type, item.type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {item.type}"
             )
-        self.code.append(("connect", name, value.expr()))
+        self.code.append(("connect", (item.type.expr(), name), value.expr()))
 
     def __str__(self) -> str:
         text = []
@@ -759,3 +784,78 @@ class _CodeBuilder:
     def cvt(self, op):
         """Convert to signed"""
         return _CvtExpr(op)
+
+
+def _ports(module: _Module) -> Sequence[tuple]:
+    ports = []
+    for p in module._iter_types(_Port):
+        assert isinstance(p, _Port)
+        direction = "input" if p.direction == INPUT else "output"
+        ports.append((p.name, direction, p.type.expr()))
+    return ports
+
+
+def _wires(module: _Module) -> Sequence[tuple]:
+    wires = []
+    for w in module._iter_types(_Wire):
+        assert isinstance(w, _Wire)
+        wires.append((w.name, w.type.expr()))
+    return wires
+
+
+def _registers(module: _Module) -> Sequence[tuple]:
+    regs = []
+    for r in module._iter_types(_Register):
+        assert isinstance(r, _Register)
+        clk = r.clock.name
+        if r.reset is None or r.reset is False:
+            reset = 0
+        else:
+            reset = (r.reset.name, r.value)
+        regs.append((r.name, r.type.expr(), clk, reset))
+    return regs
+
+
+def _instances(module: _Module) -> Sequence[tuple]:
+    instances = []
+    for i in module._iter_types(_Instance):
+        assert isinstance(i, _Instance)
+        cname, mname = i.type.name.split("::")
+        instances.append((i.name, cname, mname))
+    return instances
+
+
+def _code(module: _Module) -> Sequence[tuple]:
+    b = _CodeBuilder(module)
+    for cf in module._iter_types(_ModuleFunc):
+        if not cf.converted:
+            f, txt = convert(cf.function, module)
+            cf.function = f
+            cf.converted = True
+    for cc in module._iter_types(_ModuleCode):
+        if not cc.converted:
+            f, txt = convert(cc.function, module)
+            cc.function = f
+            cc.converted = True
+        else:
+            f = cc.function
+        f(b)
+    return b.code
+
+
+def build(module: _Module, db: dict[str, dict]) -> None:
+    """Generate intermediate format for module and add to database"""
+    m = dict(
+        ports=_ports(module),
+        wires=_wires(module),
+        registers=_registers(module),
+        instances=_instances(module),
+        code=_code(module),
+    )
+    cname, mname = module.name.split("::")
+    if "circuits" not in db:
+        db["circuits"] = {}
+    c = db["circuits"]
+    if cname not in c:
+        c[cname] = {}
+    c[cname][mname] = m

@@ -1,4 +1,5 @@
 from hamp._firrtl import generate
+from hamp._builder import build
 from hamp._module import module, input, output, wire, register, modules
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
@@ -9,7 +10,10 @@ _this = dirname(abspath(__file__))
 
 
 def _generate_and_check(name, *m):
-    code = generate(*m)
+    db = {}
+    for x in m:
+        build(x, db)
+    code = generate(db)
     with open(f"{_this}/{name}.fir", "w") as fh:
         fh.write(code)
     with open(f"{_this}/{name}_exp.fir") as fh:

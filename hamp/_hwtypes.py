@@ -9,66 +9,64 @@ from dataclasses import fields
 class _HWType:
     """Base class for all hardware modelling types"""
 
-    firrtl: Callable[[], str]
     signed: bool
+    kind: str
 
     def __getitem__(self, size: int) -> "_Array":
         """Create array type"""
         return _Array(self, size)
 
+    def expr(self):
+        return (self.kind, 1)
+
+    def __call__(self, *args, **kwargs):  # pragma: no cover
+        assert False
+
 
 class _Clock(_HWType):
     """Clock signal"""
 
-    type = "clock"
+    kind = "clock"
 
 
 class _Reset(_HWType):
     """Generic reset signal"""
 
-    type = "reset"
+    kind = "reset"
 
 
 class _AsyncReset(_Reset):
     """Asynchronous reset signal"""
 
-    type = "asynchonous_reset"
+    kind = "async_reset"
 
 
 class _SyncReset(_Reset):
     """Synchronous reset signal"""
 
-    type = "synchronous_reset"
+    kind = "sync_reset"
 
 
 class _IntValue:
     """Integer value"""
 
-    firrtl: Callable[[], str]
-
-    def __init__(self, value, type):
+    def __init__(self, value: int, type: "_Int"):
         self.value = value
         self.type = type
 
     # TODO: methods to manipulate value to it becomes useful for creating
     # constants and meta-data
 
-    def __repr__(self):
-        return f"{self.type.type}[{self.type.size}]({self.value:#x})"
+    def expr(self):
+        return (self.type.expr(), self.value)
 
-    """
-    def __eq__(self, v):
-        if isinstance(v, _IntValue):
-            return (self.type is v.type) and (self.value == v.value)
-        else:
-            return self.value == v
-    """
+    def __repr__(self):
+        return f"{self.type.kind}[{self.type.size}]({self.value:#x})"
 
 
 class _Int(_HWType):
     """Integer type base class"""
 
-    type: str
     signed: bool
     _minval: Union[int, None]
     _maxval: Union[int, None]
@@ -83,19 +81,22 @@ class _Int(_HWType):
             self._maxval is None or value <= self._maxval
         ):
             return _IntValue(value, self)
-        raise ValueError(f"{self.type}[{self.size}] cannot hold value {value}")
+        raise ValueError(f"{self.kind}[{self.size}] cannot hold value {value}")
 
     def __repr__(self):
-        return f"{self.type}[{self.size}]"
+        return f"{self.kind}[{self.size}]"
+
+    def expr(self):
+        return (self.kind, self.size)
 
 
 class _UInt(_Int):
     """Unsigned integer"""
 
-    type = "uint"
+    kind = "uint"
     signed = False
 
-    def _set_min_max(self, size):
+    def _set_min_max(self, size: int):
         self._minval = 0
         if size > 0:
             self._maxval = (1 << size) - 1
@@ -106,7 +107,7 @@ class _UInt(_Int):
 class _SInt(_Int):
     """Signed integer"""
 
-    type = "sint"
+    kind = "sint"
     signed = True
 
     def _set_min_max(self, size):
@@ -118,7 +119,11 @@ class _SInt(_Int):
 
 
 class _Array(_HWType):
-    def __init__(self, type, size: int):
+    kind = "array"
+    type: _HWType
+    size: int
+
+    def __init__(self, type: _HWType, size: int):
         self.type = type
         self.size = size
 
@@ -128,13 +133,18 @@ class _Array(_HWType):
     def __call__(self):
         return _ArrayValue(self)
 
+    def expr(self):
+        return ("array", self.size, self.type.expr())
+
 
 class _ArrayValue:
-    def __init__(self, type):
+    type: _Array
+
+    def __init__(self, type: _Array):
         self.type = type
         self.values = [type.type() for _ in range(type.size)]
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int):
         return self.values[i]
 
     def __setitem__(self, i, v):
@@ -173,7 +183,7 @@ class _IntFactory:
 class _Struct(_HWType):
     """Struct type"""
 
-    type = "Struct"
+    kind = "struct"
 
     def __init__(self, dataclass):
         self.dataclass = dataclass
@@ -183,6 +193,15 @@ class _Struct(_HWType):
 
     def __call__(self, *args, **kwargs):
         return self.dataclass(*args, **kwargs)
+
+    def expr(self):
+        flips = self.dataclass.__flips__
+        fs = [
+            (x.name, x.type.expr(), int(x.name in flips))
+            for x in fields(self.dataclass)
+            if isinstance(x.type, _HWType)
+        ]
+        return ("struct", *fs)
 
 
 def equivalent(t1, t2, sizes=True) -> bool:

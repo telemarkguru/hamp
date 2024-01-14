@@ -16,7 +16,7 @@ Format:
                 ...
             ],
             "registers": [
-                ("register-name", TYPE, RESET_SIGNAL, VALUE, ATTRIBUTES*),
+                ("register-name", TYPE, CLOCK, RESET, ATTRIBUTES*),
                 ...
             ],
             "instances": [
@@ -40,11 +40,19 @@ TYPE:
     ("sint", WIDTH)
     ("array", SIZE, TYPE)
     ("struct",
-        ("field-name", TYPE),
+        ("field-name", TYPE, FLIP),
         ...
     )
 WIDHT: -1 or non-zero positive integer.  -1 means unsized.
 SIZE: non-zero positive integer
+FLIP: 1 to mark flip, 0 otherwise
+
+CLOCK:
+    signal-name
+
+RESET:
+    0
+    (signal-name, value)
 
 STATEMENT:
     ("connect", VARIABLE, EXPRESSION, ANNOTATION*)
@@ -186,10 +194,23 @@ def _validate_wires(name: str, wires: list[tuple], vars: VARS) -> None:
 def _validate_registers(name: str, registers: list[tuple], vars: VARS) -> None:
     for r in registers:
         match r:
-            case (str(rname), type, reset, value, *annotations):
+            case (str(rname), type, clk, 0, *annotations):
                 _validate_type(type)
+                _validate_var(("clock", 1), clk, vars)
                 _validate_annotations(annotations)
-                vars[rname] = (type, "register", annotations, reset, value)
+                vars[rname] = (type, "register", annotations, clk, 0)
+            case (str(rname), type, clk, (reset, value), *annotations):
+                _validate_type(type)
+                _validate_var(("clock", 1), clk, vars)
+                _validate_annotations(annotations)
+                _validate_value(type, value, vars)
+                vars[rname] = (
+                    type,
+                    "register",
+                    annotations,
+                    clk,
+                    (reset, value),
+                )
             case _:
                 raise ValueError(
                     f"Malformed register entry in module {name}: {r}"
@@ -259,10 +280,12 @@ def _validate_type(type: tuple) -> None:
         case ("struct", *fields):
             for f in fields:
                 match f:
-                    case (str(_), type):
+                    case (str(_), type, 0) | (str(_), type, 1):
                         _validate_type(type)
                     case _:
                         raise ValueError(f"Malformed struct field {f}")
+        case ("clock", 1):
+            pass
         case _:
             raise ValueError(f"Malformed type: {type}")
 

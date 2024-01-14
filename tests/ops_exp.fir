@@ -10,7 +10,6 @@ circuit ops :
     output y : SInt<9>[2]
     output z : SInt<9>[2]
 
-    
 
     x[UInt(0)] <= dshr(a, b)
     x[UInt(1)] <= dshl(a, b)

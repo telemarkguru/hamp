@@ -21,6 +21,7 @@ circuit mux4 :
     m3.sel <= bits(sel, 1, 1)
     x <= m3.x
 
+circuit mux :
 
   module mux :
     input a : {x: UInt<2>, y: SInt<3>}
@@ -28,7 +29,6 @@ circuit mux4 :
     output x : {x: UInt<2>, y: SInt<3>}
     input sel : UInt<1>
 
-    
 
     when sel :
         x <= b

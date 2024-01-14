@@ -6,15 +6,15 @@ from pytest import raises
 
 t1 = (
     "struct",
-    ("f1", ("uint", 3)),
-    ("f2", ("uint", 4)),
-    ("f3", ("array", 7, ("uint", 10))),
+    ("f1", ("uint", 3), 0),
+    ("f2", ("uint", 4), 1),
+    ("f3", ("array", 7, ("uint", 10)), 0),
 )
 t2 = (
     "struct",
-    ("f1", t1),
-    ("f2", ("array", 3, t1)),
-    ("f3", ("array", 3, ("array", 2, t1))),
+    ("f1", t1, 0),
+    ("f2", ("array", 3, t1), 1),
+    ("f3", ("array", 3, ("array", 2, t1)), 0),
 )
 
 
@@ -27,6 +27,7 @@ def _create_db():
                     "ports": [
                         ("pi", "input", ("uint", 2)),
                         ("po", "output", ("sint", 10)),
+                        ("clk", "input", ("clock", 1)),
                     ],
                     "wires": [
                         ("a", ("uint", 2)),
@@ -122,8 +123,8 @@ def test_validate_registers():
     db = _create_db()
     bar = db["circuits"]["foo"]["bar"]
     bar["registers"] = [
-        ("r1", ("uint", 1), "reset", 3),
-        ("r2", ("sint", 3), "no", 0, "a1"),
+        ("r1", ("uint", 1), "clk", ("reset", 3)),
+        ("r2", ("sint", 3), "clk", 0, "a1"),
     ]
     validate(db)
     bar["registers"].append(("r3", 1, 2))
@@ -197,7 +198,7 @@ def test_validate_var():
                 "connect",
                 (
                     ("sint", 2),
-                    (".", (("struct", ("b", ("sint", 1))), "x"), "a"),
+                    (".", (("struct", ("b", ("sint", 1), 0)), "x"), "a"),
                 ),
                 (("sint", -3), 1),
             )

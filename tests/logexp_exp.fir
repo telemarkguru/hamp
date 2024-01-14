@@ -8,13 +8,12 @@ circuit logexp :
     output x : UInt<1>
     output y : UInt<3>
 
-    
 
     x <= and(orr(a), and(orr(b), c))
-    y <= UInt(0)
+    y <= UInt<3>(0)
     when not(orr(a)) :
-        y <= UInt(1)
+        y <= UInt<3>(1)
     else when or(orr(a), c) :
-        y <= UInt(2)
+        y <= UInt<3>(2)
     else when orr(b) :
-        y <= UInt(3)
+        y <= UInt<3>(3)

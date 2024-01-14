@@ -17,7 +17,6 @@ from copy import deepcopy
 AttrData = Union[str, int]
 AttrType = Dict[str, AttrData]
 
-
 modules: Dict[str, "_Module"] = {}
 
 
@@ -63,6 +62,8 @@ class _Module:
         This makes it easy to create and mainpulate modules
         programatically.
         """
+        if "::" not in name:
+            name = f"{name}::{name}"
         if name in modules:
             raise NameError(f"Redefinition of module {name}")
         self.name: str = name
@@ -113,7 +114,7 @@ class _Module:
         self.__setattr__(name, value)
 
     def __getitem__(self, name: str) -> _ModuleMember:
-        """Reutrn member with the given name (m[name])"""
+        """Return member with the given name (m[name])"""
         return self._members[name]
 
     def __iter__(self) -> Iterator[_ModuleMember]:
@@ -352,6 +353,8 @@ def attribute(value: AttrData) -> _Attribute:
 
 def unique(name: str) -> str:
     """Generate unique module name based on given base name"""
+    if "::" not in name:
+        name = f"{name}::{name}"
     new_name = name
     idx = 0
     while new_name in modules:
@@ -361,7 +364,9 @@ def unique(name: str) -> str:
 
 
 def instance(name: str) -> _Instance:
-    """Create an instance of a module with the given name"""
+    """
+    Create an instance of a module with the given name (circuit::module)
+    """
     if not (m := modules.get(name)):
         raise NameError(f"No module named {name} defined")
     return m()
