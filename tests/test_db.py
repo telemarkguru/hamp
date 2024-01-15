@@ -287,7 +287,11 @@ def test_validate_values():
                 t2,
                 {
                     "f1": {"f2": 3},
-                    "f3": [[{"f2": 1}, {"f1": 1}], [{"f3": [1, 2]}]],
+                    "f3": [
+                        [{"f2": 1}, {"f1": 1}],
+                        [{"f3": [1, 2, 3, 4, 5, 6, 7]}, {"f2": 0}],
+                        [{"f2": 2}, {"f1": 3}],
+                    ],
                 },
             ),
         ),
@@ -303,7 +307,7 @@ def test_validate_values():
             ("connect", (t2, "p3"), (t2, {"f1": {"fx": 3}})),
         ]
         validate(db)
-    with raises(ValueError, match="Too many array values: 8 > 7"):
+    with raises(ValueError, match="Wrong number of array values: 8 != 7"):
         ok["code"] = [
             ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [1] * 8}})),
         ]
@@ -312,7 +316,7 @@ def test_validate_values():
         ValueError, match=r"Malformed value 3\.2 of type \('uint', 10\)"
     ):
         ok["code"] = [
-            ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [3.2] * 3}})),
+            ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [3.2] * 7}})),
         ]
         validate(db)
 
