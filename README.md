@@ -104,6 +104,16 @@ def connect_fifo(x):
         ...
 ```
 
+## Use model
+
+The input Python code is first translated to an intermediate data format,
+which is a nested data structure of dictionaries, lists, tuples, integers
+and string. This data-format is defined in [here](doc/data-format.md).
+
+The intermediate data-format can then be validated and translated into
+FIRRTL.
+
+
 ## Data types
 
 ### Basic data types
