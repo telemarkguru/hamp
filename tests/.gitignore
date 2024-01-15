@@ -1,2 +1,3 @@
 *.fir
 !*_exp.fir
+*.db

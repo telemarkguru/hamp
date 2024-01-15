@@ -3,7 +3,9 @@ from hamp._builder import build
 from hamp._module import module, input, output, wire, register, modules
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
+from hamp._db import validate
 from os.path import dirname, abspath
+from pprint import pprint
 
 
 _this = dirname(abspath(__file__))
@@ -13,6 +15,9 @@ def _generate_and_check(name, *m):
     db = {}
     for x in m:
         build(x, db)
+    with open(f"{_this}/{name}.db", "w") as fh:
+        pprint(db, stream=fh, sort_dicts=False, indent=4)
+    validate(db)
     code = generate(db)
     with open(f"{_this}/{name}.fir", "w") as fh:
         fh.write(code)

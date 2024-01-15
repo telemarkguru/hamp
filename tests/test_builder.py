@@ -1,5 +1,5 @@
 from hamp._builder import _CodeBuilder, build
-from hamp._module import module, input, output, wire, modules
+from hamp._module import module, input, output, wire, modules, attribute
 from hamp._hwtypes import uint, sint
 from hamp._struct import struct
 from hamp._db import validate
@@ -36,6 +36,7 @@ def _module():
     m.s2 = wire(uint[10][20][2])
     m.b = wire(B)
     m.inst = mi()
+    m.att1 = attribute(3)
     return m, mi
 
 
@@ -310,7 +311,11 @@ def test_bit_slicing():
     xx = (("uint", 11), "xx")
     x = (("uint", 11), "x")
 
-    assert b.code[-1] == ("connect", xx, (("uint", 2), ("bits", x, 3, 2)))
+    assert b.code[-1] == (
+        "connect",
+        xx,
+        (("uint", 2), ("bits", x, (("uint", -1), 3), (("uint", -1), 2))),
+    )
 
     with raises(TypeError, match="s is not a bit-vector"):
         b.y = b.s[3:2]
@@ -421,3 +426,9 @@ def test_assign_type_checking():
         b.s[3] = b.b.c
     with raises(TypeError, match="Cannot assign non-equivalent type"):
         b.inst.w = b.b.c
+    with raises(TypeError, match="Cannot assign to instance inst"):
+        b.inst = 1
+    with raises(TypeError, match="Cannot assign value of unsupported type"):
+        b.att1 = 3
+    with raises(TypeError, match="Cannot assign to input"):
+        b.y = 3

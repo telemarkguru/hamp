@@ -205,9 +205,11 @@ class _BitsExpr(_Expr):
         self.v1 = v1
 
     def expr(self):
+        start = (("uint", -1), self.start)
+        stop = (("uint", -1), self.stop)
         return (
             self.type.expr(),
-            (self.op, self.v1.expr(), self.start, self.stop),
+            (self.op, self.v1.expr(), start, stop),
         )
 
 
@@ -631,7 +633,7 @@ class _InstanceVar(_Var):
 
     def expr(self, name):
         item = self.type[name]
-        return (item.type, (".", "instance", self._name, name))
+        return (item.type.expr(), (".", "instance", self._name, name))
 
 
 def _vartype(type, name, builder, base) -> _Var:

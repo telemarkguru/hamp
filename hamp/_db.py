@@ -286,6 +286,10 @@ def _validate_type(type: tuple) -> None:
                         raise ValueError(f"Malformed struct field {f}")
         case ("clock", 1):
             pass
+        case ("reset", 1):
+            pass
+        case ("async_reset", 1):
+            pass
         case _:
             raise ValueError(f"Malformed type: {type}")
 

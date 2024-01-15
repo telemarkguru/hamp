@@ -62,13 +62,18 @@ def _preamble(version: str = "1.1.0") -> str:
     return f"FIRRTL version {version}"
 
 
-def _expr(x: tuple) -> str:
+def _expr(x: tuple, k=False) -> str:
+    if isinstance(x, str) and k:
+        return x
     t, v = x
     match v:
         case str(v):
             return v
         case int(v):
-            return f"{_type(t)}({v})"
+            if k:
+                return v
+            else:
+                return f"{_type(t)}({v})"
         case (".", "instance", str(iname), str(pname)):
             return f"{iname}.{pname}"
         case (str(op), *args):
@@ -77,7 +82,7 @@ def _expr(x: tuple) -> str:
                 return opstr.format(e=[_expr(args[0]), args[1][1]])
             else:
                 opstr, argc, parc = _op_to_func[op]
-                e = [_expr(z) if i < argc else z for i, z in enumerate(args)]
+                e = [_expr(z, i >= argc) for i, z in enumerate(args)]
                 f = opstr.format(e=e)
                 return f
         case _:  # pragma: no cover
