@@ -54,7 +54,7 @@ def test_counter():
     m.rst = input(async_reset())
     m.en = input(u1)
     m.out = output(uint[w])
-    m.cnt = register(uint[w], m.clk, m.rst)
+    m.cnt = register(uint[w], m.clk, m.rst, value=0)
 
     def add2(x):
         return x + 2
@@ -92,8 +92,8 @@ def test_struct():
     m.din = input(Foo)
     m.dout = output(Foo)
     m.sel = input(uint[2])
-    m.x = register(Data, m.clk, False)
-    m.y = register(Data[3], m.clk, False)
+    m.x = register(Data, m.clk)
+    m.y = register(Data[3], m.clk)
 
     @m.code
     def main(x):  # pragma: no cover

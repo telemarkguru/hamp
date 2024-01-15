@@ -810,7 +810,7 @@ def _registers(module: _Module) -> Sequence[tuple]:
     for r in module._iter_types(_Register):
         assert isinstance(r, _Register)
         clk = r.clock.name
-        if r.reset is None or r.reset is False:
+        if r.value is None:
             reset = 0
         else:
             reset = (r.reset.name, r.value)

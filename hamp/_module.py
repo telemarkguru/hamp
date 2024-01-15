@@ -91,9 +91,9 @@ class _Module:
         self._members[name] = value
         value.name = name
         if isinstance(value, _Register):
-            if value.clock is None:
+            if value.clock is NULL_DATA_MEMBER:
                 value.clock = self._find_clock()
-            if value.reset is None:
+            if value.reset is NULL_DATA_MEMBER and value.value is not None:
                 value.reset = self._find_reset()
         elif isinstance(value, _Instance):
             value.name = name
@@ -201,6 +201,9 @@ class _DataMember(_ModuleMember):
     type: Union[_HWType, _Module]
 
 
+NULL_DATA_MEMBER = _DataMember()
+
+
 class _Port(_DataMember):
     """Port module member"""
 
@@ -235,9 +238,9 @@ class _Register(_LocalDataMember):
     def __init__(
         self,
         type: _HWType,
-        clock: Union[_DataMember, None],
-        reset: Union[_DataMember, None, bool],
-        value: Union[int, _HWType],
+        clock: _DataMember,
+        reset: _DataMember,
+        value: Union[int, _HWType, None],
         attributes: AttrType,
     ):
         self.type = type
@@ -328,9 +331,9 @@ def wire(type: _HWType, **attributes: AttrData) -> _Wire:
 
 def register(
     type: _HWType,
-    clock: Union[_DataMember, None] = None,
-    reset: Union[_DataMember, None, bool] = None,
-    value: Union[int, _HWType] = 0,
+    clock: _DataMember = NULL_DATA_MEMBER,
+    reset: _DataMember = NULL_DATA_MEMBER,
+    value: Union[int, _HWType, None] = None,
     **attributes: AttrData,
 ) -> _Register:
     """Create register module member of the given type.

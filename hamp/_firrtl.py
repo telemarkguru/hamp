@@ -71,7 +71,7 @@ def _expr(x: tuple, k=False) -> str:
             return v
         case int(v):
             if k:
-                return v
+                return str(v)
             else:
                 return f"{_type(t)}({v})"
         case (".", "instance", str(iname), str(pname)):
