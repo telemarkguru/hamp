@@ -1,6 +1,7 @@
 """Code builder"""
 
 from contextlib import contextmanager
+from enum import Enum
 from typing import Union, Tuple, List, Any, Type, Sequence
 from ._module import (
     _Module,
@@ -27,7 +28,7 @@ from ._hwtypes import (
     INPUT,
     OUTPUT,
 )
-from ._struct import member
+from ._struct import member, flipped
 from ._convert import convert
 
 
@@ -468,6 +469,11 @@ class _Var:
         self._builder = builder
         self._base = base
 
+    def _full_name(self, name: str = "") -> str:
+        if self._base:
+            return self._base._full_name(self._name)
+        return self._name
+
 
 class _IntVarExpr(_Expr, _Var):
     def __init__(
@@ -486,28 +492,51 @@ class _IntVarExpr(_Expr, _Var):
         return (self.type.expr(), self._name)
 
 
+class Access(Enum):
+    ANY = 0
+    WR = 1
+    RD = 2
+
+
+def _flip_access(a, flip):
+    if flip:
+        if a == Access.WR:
+            return Access.RD
+        if a == Access.RD:
+            return Access.WR
+    return a
+
+
 class _StructVar(_Var):
-    _VARS = set(("_name", "type", "_builder", "_base"))
+    _VARS = set(("_name", "type", "_builder", "_base", "_access"))
     type: _Struct
 
     def __init__(
         self,
         type: _Struct,
         name: str,
+        access: Access,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
         super().__init__(name, builder, base)
         self.type = type
+        self._access = access
 
     def __getattr__(self, name: str) -> _Var:
         item = member(self.type, name)
-        return _vartype(item, name, self._builder, self)
+        access = _flip_access(self._access, flipped(self.type, name))
+        return _vartype(item, name, self._builder, self, access)
 
     def __setattr__(self, name: str, value: Union[_Expr, int]):
         if name in _StructVar._VARS:
             super().__setattr__(name, value)
             return
+        access = _flip_access(self._access, flipped(self.type, name))
+        if access == Access.RD:
+            raise TypeError(
+                f"Not allowed to assign to {self._full_name(name)}"
+            )
         item = member(self.type, name)
         if isinstance(value, int):
             value = _infer_int(item, value)
@@ -527,6 +556,15 @@ class _StructVar(_Var):
             return (item, (".", self._base.expr(self._name), name))
         return (item, (".", (self.type.expr(), self._name), name))
 
+    def _full_name(self, name: str = "") -> str:
+        if name:
+            name = f"{self._name}.{name}"
+        else:
+            name = self._name
+        if self._base:
+            return self._base._full_name(name)
+        return name
+
 
 class _ArrayVar(_Var):
     type: _Array
@@ -536,12 +574,14 @@ class _ArrayVar(_Var):
         self,
         type: _Array,
         name: str,
+        access: Access,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
         super().__init__(name, builder, base)
         self.type = type
         self.idx = None
+        self.access = access
 
     def _chk_idx(self, idx: int) -> _ConstExpr:
         size = self.type.size
@@ -557,13 +597,15 @@ class _ArrayVar(_Var):
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
         self.idx = idx
-        return _vartype(self.type.type, "", self._builder, self)
+        return _vartype(self.type.type, "", self._builder, self, self.access)
 
     def __setitem__(self, idx: OpType, value: OpType) -> None:
         type = self.type.type
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
         self.idx = idx
+        if self.access == Access.RD:
+            raise TypeError(f"Not allowed to assign to {self._full_name()}")
         if isinstance(value, int):
             value = _ConstExpr(value, type.signed)
         if not equivalent(value.type, type, False):
@@ -584,6 +626,17 @@ class _ArrayVar(_Var):
             return (rt, ("[]", (t, b), i))
         else:
             return (t, b)
+
+    def _full_name(self, name: str = "") -> str:
+        if name:
+            name = f"{self._name}[]{name}"
+        else:
+            name = self._name
+            if self.idx is not None:
+                name += "[]"
+        if self._base:
+            return self._base._full_name(name)
+        return name
 
 
 class _InstanceVar(_Var):
@@ -607,7 +660,8 @@ class _InstanceVar(_Var):
             )
         item = self.type[name]
         if isinstance(item, _Port):
-            return _vartype(item.type, name, self._builder, self)
+            access = Access.WR if item.direction == INPUT else Access.RD
+            return _vartype(item.type, name, self._builder, self, access)
         raise TypeError(
             f"Cannot access {name} in instance of {self.type.name}"
         )
@@ -621,8 +675,10 @@ class _InstanceVar(_Var):
                 f"Module {self.type.name} has no member {name}"
             )
         item = self.type[name]
-        assert isinstance(item, _DataMember)
-        # TODO: check that member is (part of) output, wire or register
+        if not isinstance(item, _Port) or item.direction != INPUT:
+            raise TypeError(
+                f"Cannot assign non-input of instance {self._name}: {name}"
+            )
         if isinstance(value, int):
             value = _infer_int(item.type, value)
         if not equivalent(value.type, item.type, False):
@@ -635,12 +691,19 @@ class _InstanceVar(_Var):
         item = self.type[name]
         return (item.type.expr(), (".", "instance", self._name, name))
 
+    def _full_name(self, name: str = "") -> str:
+        if name:
+            name = f"{self._name}.{name}"
+        else:
+            name = self._name
+        return name
 
-def _vartype(type, name, builder, base) -> _Var:
+
+def _vartype(type, name, builder, base, access=Access.ANY) -> _Var:
     if isinstance(type, _Struct):
-        return _StructVar(type, name, builder, base)
+        return _StructVar(type, name, access, builder, base)
     elif isinstance(type, _Array):
-        return _ArrayVar(type, name, builder, base)
+        return _ArrayVar(type, name, access, builder, base)
     elif isinstance(type, _Module):
         return _InstanceVar(type, name, builder, base)
     return _IntVarExpr(type, name, builder, base)
@@ -680,7 +743,10 @@ class _CodeBuilder:
         if isinstance(item, _ModuleFunc):
             return self.module[name]
         if isinstance(item, _DataMember):
-            return _vartype(item.type, name, self, None)
+            access = Access.ANY
+            if isinstance(item, _Port):
+                access = Access.RD if item.direction == INPUT else Access.WR
+            return _vartype(item.type, name, self, None, access)
         return False  # pragma: no cover
 
     def __setattr__(self, name: str, value) -> None:

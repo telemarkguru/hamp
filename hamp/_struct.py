@@ -46,6 +46,12 @@ def flip(type):
     return type, True
 
 
+def flipped(s: _Struct, name: str) -> bool:
+    """Return True if member is flipped"""
+    assert isinstance(s, _Struct)
+    return name in s.dataclass.__flips__
+
+
 def member(s: _Struct, name: str) -> Union[type, None]:
     """Return member type if struct class has member with given name.
     Return None if not.

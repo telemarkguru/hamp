@@ -1,7 +1,7 @@
 from hamp._builder import _CodeBuilder, build
 from hamp._module import module, input, output, wire, modules, attribute
 from hamp._hwtypes import uint, sint
-from hamp._struct import struct
+from hamp._struct import struct, flip
 from hamp._db import validate
 from textwrap import dedent
 from pytest import raises
@@ -11,14 +11,19 @@ from pprint import pprint
 @struct
 class A:
     a: uint[2]
-    b: uint[2]
+    b: flip(uint[2])
 
 
 @struct
 class B:
     c: A
-    d: A
+    d: flip(A)
     e: sint[4]
+
+
+@struct
+class C:
+    f: A[3]
 
 
 def _module():
@@ -26,6 +31,7 @@ def _module():
     mi = module("mod::inst")
     mi.w = wire(sint[2])
     mi.i = input(uint[2])
+    mi.p = input(C)
     m = module("mod")
     m.x = output(uint[11])
     m.xx = output(uint[11])
@@ -35,6 +41,8 @@ def _module():
     m.s = wire(uint[10][20])
     m.s2 = wire(uint[10][20][2])
     m.b = wire(B)
+    m.ba = wire(C[3])
+    m.p = input(C)
     m.inst = mi()
     m.att1 = attribute(3)
     return m, mi
@@ -237,8 +245,8 @@ def test_op2():
     b.b.e = b.cvt(b.x)
     bt = (
         "struct",
-        ("c", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 0)), 0),
-        ("d", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 0)), 0),
+        ("c", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 0),
+        ("d", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 1),
         ("e", ("sint", 4), 0),
     )
     assert b.code[-1] == (
@@ -379,6 +387,9 @@ def test_array_indexing():
 
     b.s2[1] = b.s2[0]
 
+    assert b.s2[1]._full_name() == "s2[]"
+    assert b.s2[1][2]._full_name() == "s2[][]"
+
 
 def test_struct_member_access():
     """Test x.a, a.b.c etc"""
@@ -388,14 +399,36 @@ def test_struct_member_access():
     b.b.c.a = b.b.d.b
     b.b.c.a = 1
 
+    assert b.y._full_name() == "y"
+    assert b.b._full_name() == "b"
+    assert b.b.c.a._full_name() == "b.c.a"
+    assert b.ba[2].f[1].a._full_name() == "ba[].f[].a"
+
     with raises(AttributeError, match=r"has no member bix"):
         b.b.c.bix
+
+    b.p.f[1].b = 1
+    with raises(TypeError, match=r"Not allowed to assign to p.f\[\].a"):
+        b.p.f[1].a = 1
+    with raises(TypeError, match=r"Not allowed to assign to p.f\[\]"):
+        b.p.f[1] = 1
+
+    b.b.c.b = 1
+    b.b.c.a = 1
+    b.b.d.a = 1
+    b.b.d.b = 1
 
 
 def test_instance_port_access():
     b = _setup()
 
     b.inst.i = 3
+    assert b.inst._full_name() == "inst"
+    assert b.inst.i._full_name() == "inst.i"
+
+    b.inst.p.f[1].a = 1
+    with raises(TypeError, match=r"Not allowed to assign to inst.p.f\[\].b"):
+        b.inst.p.f[1].b = 1
 
 
 def test_assign_type_checking():
@@ -425,6 +458,10 @@ def test_assign_type_checking():
     with raises(TypeError, match="Cannot assign non-equivalent type"):
         b.s[3] = b.b.c
     with raises(TypeError, match="Cannot assign non-equivalent type"):
+        b.inst.i = b.b.c
+    with raises(
+        TypeError, match="Cannot assign non-input of instance inst: w"
+    ):
         b.inst.w = b.b.c
     with raises(TypeError, match="Cannot assign to instance inst"):
         b.inst = 1
