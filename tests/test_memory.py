@@ -57,6 +57,7 @@ def test_base_type_memory():
                     "registers": [],
                     "instances": [],
                     "code": [],
+                    "attributes": {"_ismem": 1},
                 }
             }
         }

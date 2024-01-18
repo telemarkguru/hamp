@@ -13,6 +13,7 @@ from ._module import (
     _Port,
     _Wire,
     _Register,
+    _Attribute,
 )
 
 from ._hwtypes import (
@@ -911,6 +912,10 @@ def _code(module: _Module) -> Sequence[tuple]:
     return b.code
 
 
+def _attributes(module: _Module) -> dict:
+    return {a.name: a.value for a in module._iter_types(_Attribute)}
+
+
 def build(module: _Module, db: dict[str, dict]) -> None:
     """Generate intermediate format for module and add to database"""
     m = dict(
@@ -919,6 +924,7 @@ def build(module: _Module, db: dict[str, dict]) -> None:
         registers=_registers(module),
         instances=_instances(module),
         code=_code(module),
+        attributes=_attributes(module),
     )
     cname, mname = module.name.split("::")
     if "circuits" not in db:
