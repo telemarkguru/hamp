@@ -27,6 +27,7 @@ MODULE:
         "registers": [*REGISTER]
         "instances": [*INSTANCE],
         "code": [*CODE],
+        "attributes": ATTRIBUTES,
     }
 
 PORT:
@@ -91,5 +92,21 @@ CODE:
     ("when", (("uint", 1), VALUE), (*CODE), *ATTRIBUTES)
     ("else-when", (("uint", 1), VALUE), (*CODE), *ATTRIBUTES)
     ("else", (*CODE), *ATTRIBUTES)
-```
 
+ATTRIBUTES:
+    {}
+    {
+        NAME: ATTRVAL
+        ...
+    }
+
+ATTRVAL:
+    integer
+    string
+    [*ATTRVAL]
+    {
+        string: ATTRVAL
+        ...
+    }
+
+```

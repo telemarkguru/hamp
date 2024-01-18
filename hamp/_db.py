@@ -156,26 +156,55 @@ def _validate_module(name: str, items: DB, db: DB) -> None:
                 _validate_instances(name, instances, vars, db)
             case ("code", list(statements)):
                 _validate_code(name, statements, vars)
+            case ("attributes", dict(attributes)):
+                _validate_attributes(attributes)
             case _:
                 raise ValueError(f"Malformed item in module {name}: {m}")
 
 
-def _validate_annotations(annotations) -> None:
-    # TODO: add validation
-    pass
+def _validate_attributes(attributes) -> None:
+    if isinstance(attributes, list):
+        for x in attributes:
+            _validate_attributes(x)
+        return
+    for k, v in attributes.items():
+        _validate_name(k)
+        _validate_attribute_value(v)
+
+
+def _validate_attribute_value(v):
+    match v:
+        case int(x):
+            pass
+        case str(x):
+            pass
+        case float(x):
+            pass
+        case dict(x):
+            for k, v in x.items():
+                _validate_name(k)
+                _validate_attribute_value(v)
+        case list(x):
+            for v in x:
+                _validate_attribute_value(v)
+        case tuple(x):
+            for v in x:
+                _validate_attribute_value(v)
+        case _:
+            raise ValueError(f"Malformed attribute value: {v}")
 
 
 def _validate_ports(name: str, ports: list[tuple], vars: VARS) -> None:
     for p in ports:
         match p:
-            case (str(pname), "input", type, *annotations):
+            case (str(pname), "input", type, *attributes):
                 _validate_type(type)
-                _validate_annotations(annotations)
-                vars[pname] = (type, "input", annotations)
-            case (str(pname), "output", type, *annotations):
+                _validate_attributes(attributes)
+                vars[pname] = (type, "input", attributes)
+            case (str(pname), "output", type, *attributes):
                 _validate_type(type)
-                _validate_annotations(annotations)
-                vars[pname] = (type, "output", annotations)
+                _validate_attributes(attributes)
+                vars[pname] = (type, "output", attributes)
             case _:
                 raise ValueError(f"Malformed port entry in module {name}: {p}")
 
@@ -183,10 +212,10 @@ def _validate_ports(name: str, ports: list[tuple], vars: VARS) -> None:
 def _validate_wires(name: str, wires: list[tuple], vars: VARS) -> None:
     for w in wires:
         match w:
-            case (str(wname), type, *annotations):
+            case (str(wname), type, *attributes):
                 _validate_type(type)
-                _validate_annotations(annotations)
-                vars[wname] = (type, "wire", annotations)
+                _validate_attributes(attributes)
+                vars[wname] = (type, "wire", attributes)
             case _:
                 raise ValueError(f"Malformed wire entry in module {name}: {w}")
 
@@ -194,20 +223,20 @@ def _validate_wires(name: str, wires: list[tuple], vars: VARS) -> None:
 def _validate_registers(name: str, registers: list[tuple], vars: VARS) -> None:
     for r in registers:
         match r:
-            case (str(rname), type, clk, 0, *annotations):
+            case (str(rname), type, clk, 0, *attributes):
                 _validate_type(type)
                 _validate_var(("clock", 1), clk, vars)
-                _validate_annotations(annotations)
-                vars[rname] = (type, "register", annotations, clk, 0)
-            case (str(rname), type, clk, (reset, value), *annotations):
+                _validate_attributes(attributes)
+                vars[rname] = (type, "register", attributes, clk, 0)
+            case (str(rname), type, clk, (reset, value), *attributes):
                 _validate_type(type)
                 _validate_var(("clock", 1), clk, vars)
-                _validate_annotations(annotations)
+                _validate_attributes(attributes)
                 _validate_value(type, value, vars)
                 vars[rname] = (
                     type,
                     "register",
-                    annotations,
+                    attributes,
                     clk,
                     (reset, value),
                 )
@@ -222,8 +251,8 @@ def _validate_instances(
 ) -> None:
     for i in instances:
         match i:
-            case (str(iname), str(cname), str(mname), *annotations):
-                _validate_annotations(annotations)
+            case (str(iname), str(cname), str(mname), *attributes):
+                _validate_attributes(attributes)
                 try:
                     m = db["circuits"][cname][mname]
                 except KeyError:
@@ -243,22 +272,22 @@ def _validate_code(name: str, statements: list[tuple], vars: VARS) -> None:
     var: VAR
     for statement in statements:
         match statement:
-            case ("connect", (t1, var), (t2, val), *annotations):
+            case ("connect", (t1, var), (t2, val), *attributes):
                 _validate_type(t1)
                 _validate_var(t1, var, vars)
                 _validate_value(t2, val, vars)
-                _validate_annotations(annotations)
-            case ("when", (("uint", 1), val), stmnts, *annotations):
+                _validate_attributes(attributes)
+            case ("when", (("uint", 1), val), stmnts, *attributes):
                 _validate_value(("uint", 1), val, vars)
                 _validate_code(name, stmnts, vars)
-                _validate_annotations(annotations)
-            case ("else-when", (("uint", 1), val), stmnts, *annotations):
+                _validate_attributes(attributes)
+            case ("else-when", (("uint", 1), val), stmnts, *attributes):
                 _validate_value(("uint", 1), val, vars)
                 _validate_code(name, stmnts, vars)
-                _validate_annotations(annotations)
-            case ("else", stmnts, *annotations):
+                _validate_attributes(attributes)
+            case ("else", stmnts, *attributes):
                 _validate_code(name, stmnts, vars)
-                _validate_annotations(annotations)
+                _validate_attributes(attributes)
             case _:
                 raise ValueError(
                     f"Malformed statement in module {name}: {statement}"

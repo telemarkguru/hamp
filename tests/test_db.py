@@ -110,7 +110,7 @@ def test_validate_wires():
     db = _create_db()
     bar = db["circuits"]["foo"]["bar"]
     bar["wires"] = [
-        ("p1", ("uint", 1), 3),
+        ("p1", ("uint", 1), {"k": 3}),
         ("p2", ("sint", 3)),
     ]
     validate(db)
@@ -124,11 +124,16 @@ def test_validate_registers():
     bar = db["circuits"]["foo"]["bar"]
     bar["registers"] = [
         ("r1", ("uint", 1), "clk", ("reset", 3)),
-        ("r2", ("sint", 3), "clk", 0, "a1"),
+        ("r2", ("sint", 3), "clk", 0, {"a1": [1, 2, 3]}),
     ]
     validate(db)
     bar["registers"].append(("r3", 1, 2))
     with raises(ValueError, match="Malformed register entry in module bar"):
+        validate(db)
+    with raises(ValueError, match="Malformed attribute value"):
+        bar["registers"] = [
+            ("r2", ("sint", 3), "clk", 0, {"a1": None}),
+        ]
         validate(db)
 
 
@@ -141,10 +146,10 @@ def test_validate_code():
             "when",
             (("uint", 1), "x"),
             (("connect", (("uint", 1), "z"), (("uint", 1), "p")),),
-            "anno",
+            {"anno": (4.1, "a")},
         ),
-        ("else-when", (("uint", 1), "t"), (), "anno2", "anno3"),
-        ("else", (), "anno2"),
+        ("else-when", (("uint", 1), "t"), (), {"anno2": "a"}, {"anno3": 1}),
+        ("else", (), {"anno2": {"a": {"b": [{"c": 1}]}}}),
     ]
     validate(db)
     bar["code"].append(("bluppa", 1, 2))
