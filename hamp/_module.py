@@ -62,12 +62,14 @@ class _Module:
         This makes it easy to create and mainpulate modules
         programatically.
         """
+        self._members: Dict[str, _ModuleMember] = {}
+        if not name:  # Anonymous module
+            return
         if "::" not in name:
             name = f"{name}::{name}"
         if name in modules:
             raise NameError(f"Redefinition of module {name}")
         self.name: str = name
-        self._members: Dict[str, _ModuleMember] = {}
         modules[name] = self
 
     def __call__(self) -> "_Instance":

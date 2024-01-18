@@ -1,11 +1,11 @@
 """Composit data types"""
 
 from dataclasses import dataclass, field, fields
-from ._hwtypes import _Int, _Struct, _Array, _HWType
+from ._hwtypes import _Int, _Struct, _Array, _HWType, _Clock
 from typing import Union, Iterator, Tuple
 
 
-def struct(c):
+def struct(c) -> _Struct:
     """Class decorator to make a class a struct.
     It preprocesses the class members and then
     calls dataclass to generate a dataclass Python class
@@ -17,7 +17,7 @@ def struct(c):
             t, _ = t
             c.__flips__.add(a)
             c.__annotations__[a] = t
-        if isinstance(t, _Int):
+        if isinstance(t, (_Int, _Clock)):
             if not hasattr(c, a):
                 setattr(c, a, t(0))
         elif hasattr(t, "__hamp_struct__"):

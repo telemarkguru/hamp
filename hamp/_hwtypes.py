@@ -28,6 +28,9 @@ class _Clock(_HWType):
 
     kind = "clock"
 
+    def __call__(self, value: int = 0):
+        return 0
+
 
 class _Reset(_HWType):
     """Generic reset signal"""
