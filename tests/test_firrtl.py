@@ -135,7 +135,7 @@ def test_index():
     modules.clear()
 
     m = module("index")
-    m.a = input(sint[8][4][3])
+    m.a = input(sint[8][3][4])
     m.x = input(uint[2])
     m.y = input(uint[2])
     m.z = output(uint[18])
@@ -233,7 +233,7 @@ def test_composit_data_types():
         x: C
         y: C
         z: C[4]
-        g: C[4][2]
+        g: C[2][4]
 
     @struct
     class R:

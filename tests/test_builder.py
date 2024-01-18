@@ -39,7 +39,7 @@ def _module():
     m.y = input(uint[10])
     m.z = wire(uint[10])
     m.s = wire(uint[10][20])
-    m.s2 = wire(uint[10][20][2])
+    m.s2 = wire(uint[10][2][20])
     m.b = wire(B)
     m.ba = wire(C[3])
     m.p = input(C)
@@ -364,13 +364,13 @@ def test_array_indexing():
         (("uint", 10), ("[]", s, (("uint", -1), 1))),
     )
 
-    b.xx = b.s2[1][2]
+    b.xx = b.s2[1][8]
     assert b.code[-1] == (
         "connect",
         xx,
         (
             ("uint", 10),
-            ("[]", (s[0], ("[]", s2, (("uint", -1), 1))), (("uint", -1), 2)),
+            ("[]", (s[0], ("[]", s2, (("uint", -1), 1))), (("uint", -1), 8)),
         ),
     )
 
@@ -389,6 +389,8 @@ def test_array_indexing():
 
     assert b.s2[1]._full_name() == "s2[]"
     assert b.s2[1][2]._full_name() == "s2[][]"
+
+    assert repr(b.s2.type) == "uint[10][2][20]"
 
 
 def test_struct_member_access():

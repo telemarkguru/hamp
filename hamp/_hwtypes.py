@@ -127,8 +127,24 @@ class _Array(_HWType):
         self.type = type
         self.size = size
 
+    def __getitem__(self, size: int) -> "_Array":
+        t0 = _Array(self, size)
+        t = t0
+        # Rotate sizes:
+        while isinstance(t.type, _Array):
+            t.size = t.type.size
+            t = t.type
+        t.size = size
+        return t0
+
     def __repr__(self):
-        return f"{repr(self.type)}[{self.size}]"
+        sizes = [self.size]
+        t = self.type
+        if isinstance(t, _Array):
+            sizes.append(t.size)
+            t = t.type
+        dim = "".join(f"[{x}]" for x in sizes)
+        return f"{repr(t)}{dim}"
 
     def __call__(self):
         return _ArrayValue(self)
