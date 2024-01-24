@@ -135,7 +135,7 @@ def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
     start = srccode.find("def ")
     srccode = srccode[start:]
     file = func.__code__.co_filename
-    line = func.__code__.co_firstlineno
+    line = func.__code__.co_firstlineno + 1
     code = compile(srccode, file, "exec")
     syms: Dict[str, Any] = {**func.__globals__, **_closure_locals(func)}
     exec(code, syms)
