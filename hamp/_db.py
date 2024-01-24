@@ -221,6 +221,8 @@ def _validate_wires(name: str, wires: list[tuple], vars: VARS) -> None:
 
 
 def _validate_registers(name: str, registers: list[tuple], vars: VARS) -> None:
+    value: Union[tuple, int]
+    reset: tuple
     for r in registers:
         match r:
             case (str(rname), type, clk, 0, *attributes):

@@ -72,9 +72,9 @@ class _Module:
         self.name: str = name
         modules[name] = self
 
-    def __call__(self) -> "_Instance":
+    def __call__(self, **attributes: AttrData) -> "_Instance":
         """Create and return and instance of this module."""
-        return _Instance(self)
+        return _Instance(self, attributes)
 
     def __setattr__(self, name: str, value: _ModuleMember) -> None:
         """Add ports, wires, states, instances, cod
@@ -201,6 +201,7 @@ class _DataMember(_ModuleMember):
     """A member holding data"""
 
     type: Union[_HWType, _Module]
+    attributes: AttrType
 
 
 NULL_DATA_MEMBER = _DataMember()
@@ -211,9 +212,12 @@ class _Port(_DataMember):
 
     type: _HWType
 
-    def __init__(self, type: _HWType, direction: _Direction):
+    def __init__(
+        self, type: _HWType, direction: _Direction, attributes: AttrType
+    ):
         self.type = type
         self.direction = direction
+        self.attributes = attributes
 
 
 class _LocalDataMember(_DataMember):
@@ -224,7 +228,6 @@ class _Wire(_LocalDataMember):
     """Wire module member"""
 
     type: _HWType
-    attributes: AttrType
 
     def __init__(self, type: _HWType, attributes: AttrType):
         self.type = type
@@ -235,7 +238,6 @@ class _Register(_LocalDataMember):
     """State module member"""
 
     type: _HWType
-    attributes: AttrType
 
     def __init__(
         self,
@@ -261,10 +263,11 @@ class _Instance(_LocalDataMember):
     name: str
     type: _Module
 
-    def __init__(self, module: _Module):
+    def __init__(self, module: _Module, attributes: AttrType):
         self.module = module
         self.name = ""
         self.type = module
+        self.attributes = attributes
 
     def __getattr__(self, name) -> "_Port":
         """Return module port"""
@@ -316,14 +319,14 @@ class _Attribute(_ModuleMember):
 module = _Module
 
 
-def input(type: _HWType) -> _Port:
+def input(type: _HWType, **attributes: AttrData) -> _Port:
     """Create input module member of the given type"""
-    return _Port(type, INPUT)
+    return _Port(type, INPUT, attributes)
 
 
-def output(type: _HWType) -> _Port:
+def output(type: _HWType, **attributes: AttrData) -> _Port:
     """Create output module member of the given type"""
-    return _Port(type, OUTPUT)
+    return _Port(type, OUTPUT, attributes)
 
 
 def wire(type: _HWType, **attributes: AttrData) -> _Wire:
@@ -368,13 +371,13 @@ def unique(name: str) -> str:
     return new_name
 
 
-def instance(name: str) -> _Instance:
+def instance(name: str, **attributes: AttrData) -> _Instance:
     """
     Create an instance of a module with the given name (circuit::module)
     """
     if not (m := modules.get(name)):
         raise NameError(f"No module named {name} defined")
-    return m()
+    return m(**attributes)
 
 
 def ports(m: _Module) -> Iterator[_Port]:
