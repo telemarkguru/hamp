@@ -234,3 +234,37 @@ def fsm(m):
     ...
 ```
 
+## Meta-programming
+
+The *code* and *function* methods can also take a function passed as an
+argument, and thereby allow functionality/logic inside a module to be
+customized from outside.
+
+```Python
+def counter(name, update_func, rst_value):
+
+    m = module(name)
+    m.clk = input(clock())
+    m.rst = input(reset())
+    m.state = reg(uint[32], value=rst_value)
+    m.update = input(u1)
+    m.function(update_func)
+
+    @m.code
+    def main(m):
+        if m.update:
+            m.update_func(m)
+
+    return m
+
+
+def shift(m):
+    if m.state[31]:
+        m.state = 1
+    else:
+        m.state = m.state << 1
+
+
+shift_counter = counter("shift_counter", shift, 1)
+
+```
