@@ -109,6 +109,8 @@ def _type(t: tuple) -> str:
             return "AsyncReset"
         case ("sync_reset", 1):
             return "SyncReset"
+        case ("reset", 1):
+            return "AsyncReset"
         case _:  # pragma no cover
             assert False, f"t={t}"
 

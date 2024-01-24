@@ -231,7 +231,7 @@ def equivalent(t1, t2, sizes=True) -> bool:
         if sizes:
             return t1 is t2
         else:
-            return t1.signed == t2.signed
+            return t1.signed == t2.signed and t1.size >= t2.size
     if isinstance(t1, _Struct):
         fl1 = [x for x in fields(t1.dataclass) if isinstance(x.type, _HWType)]
         fl2 = [x for x in fields(t2.dataclass) if isinstance(x.type, _HWType)]

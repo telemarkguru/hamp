@@ -10,5 +10,5 @@ circuit test :
     reg cnt : UInt<10>, clk with: (reset => (rst, UInt<10>(0)))
 
     when en :
-        cnt <= add(cnt, UInt(3))
+        cnt <= bits(add(cnt, UInt(3)), 9, 0)
     out <= cnt

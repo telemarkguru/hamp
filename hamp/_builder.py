@@ -609,7 +609,7 @@ class _ArrayVar(_Var):
             raise TypeError(f"Not allowed to assign to {self._full_name()}")
         if isinstance(value, int):
             value = _ConstExpr(value, type.signed)
-        if not equivalent(value.type, type, False):
+        if not equivalent(type, value.type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {type}"
             )
@@ -682,7 +682,7 @@ class _InstanceVar(_Var):
             )
         if isinstance(value, int):
             value = _infer_int(item.type, value)
-        if not equivalent(value.type, item.type, False):
+        if not equivalent(item.type, value.type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {item.type}"
             )
@@ -771,10 +771,11 @@ class _CodeBuilder:
             raise TypeError(f"Cannot assign to instance {name}")
         if isinstance(value, int):
             value = _infer_int(item.type, value)
-        if not equivalent(value.type, item.type, False):
+        if not equivalent(item.type, value.type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {item.type}"
             )
+        assert isinstance(item, (_Port, _Wire, _Register))
         self.code.append(("connect", (item.type.expr(), name), value.expr()))
 
     def __str__(self) -> str:
@@ -860,7 +861,7 @@ def _ports(module: _Module) -> Sequence[tuple]:
     for p in module._iter_types(_Port):
         assert isinstance(p, _Port)
         direction = "input" if p.direction == INPUT else "output"
-        ports.append((p.name, direction, p.type.expr()))
+        ports.append((p.name, direction, p.type.expr(), p.attributes))
     return ports
 
 
@@ -868,11 +869,12 @@ def _wires(module: _Module) -> Sequence[tuple]:
     wires = []
     for w in module._iter_types(_Wire):
         assert isinstance(w, _Wire)
-        wires.append((w.name, w.type.expr()))
+        wires.append((w.name, w.type.expr(), w.attributes))
     return wires
 
 
 def _registers(module: _Module) -> Sequence[tuple]:
+    reset: Union[int, tuple]
     regs = []
     for r in module._iter_types(_Register):
         assert isinstance(r, _Register)
@@ -881,7 +883,7 @@ def _registers(module: _Module) -> Sequence[tuple]:
             reset = 0
         else:
             reset = (r.reset.name, r.value)
-        regs.append((r.name, r.type.expr(), clk, reset))
+        regs.append((r.name, r.type.expr(), clk, reset, r.attributes))
     return regs
 
 
@@ -890,7 +892,7 @@ def _instances(module: _Module) -> Sequence[tuple]:
     for i in module._iter_types(_Instance):
         assert isinstance(i, _Instance)
         cname, mname = i.type.name.split("::")
-        instances.append((i.name, cname, mname))
+        instances.append((i.name, cname, mname, i.attributes))
     return instances
 
 

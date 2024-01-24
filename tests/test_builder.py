@@ -18,7 +18,7 @@ class A:
 class B:
     c: A
     d: flip(A)
-    e: sint[4]
+    e: sint[12]
 
 
 @struct
@@ -30,20 +30,21 @@ def _module():
     modules.clear()
     mi = module("mod::inst")
     mi.w = wire(sint[2])
-    mi.i = input(uint[2])
+    mi.i = input(uint[2], z=2)
     mi.p = input(C)
     m = module("mod")
-    m.x = output(uint[11])
+    m.x = output(uint[20], z=1)
+    m.bigx = output(uint[1033])
     m.xx = output(uint[11])
     m.xs = output(sint[11])
     m.y = input(uint[10])
     m.z = wire(uint[10])
-    m.s = wire(uint[10][20])
+    m.s = wire(uint[10][20], a=1)
     m.s2 = wire(uint[10][2][20])
     m.b = wire(B)
     m.ba = wire(C[3])
     m.p = input(C)
-    m.inst = mi()
+    m.inst = mi(k=3)
     m.att1 = attribute(3)
     return m, mi
 
@@ -68,7 +69,7 @@ def test_module_builder():
 def test_code_builder():
     b = _setup()
     b.x = 3
-    assert b.code == [("connect", (("uint", 11), "x"), (("uint", 11), 3))]
+    assert b.code == [("connect", (("uint", 20), "x"), (("uint", 20), 3))]
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
@@ -80,42 +81,42 @@ def test_code_builder():
 
     assert b.code == [
         # fmt: off
-        ("connect", (("uint", 11), "x"), (("uint", 11), 3)),
+        ("connect", (("uint", 20), "x"), (("uint", 20), 3)),
         ("connect",
-            (("uint", 11), "x"),
+            (("uint", 20), "x"),
             (("uint", 11), ("+", (("uint", 10), "y"), (("uint", 10), "z")))
         ),
         ("when",
             (("uint", 1), ("==", (("uint", 10), "y"), (("uint", 10), "z"))), (
-                ("connect", (("uint", 11), "x"), (("uint", 11), 7)),
+                ("connect", (("uint", 20), "x"), (("uint", 20), 7)),
         )),
         ("else-when",
             (("uint", 1), (">", (("uint", 10), "y"), (("uint", 10), "z"))), (
-                ("connect", (("uint", 11), "x"), (("uint", 11), 10)),
+                ("connect", (("uint", 20), "x"), (("uint", 20), 10)),
         )),
         ("else", (
-            ("connect", (("uint", 11), "x"), (("uint", 11), 0)),
+            ("connect", (("uint", 20), "x"), (("uint", 20), 0)),
         )),
         # fmt: on
     ]
 
-    x = "(('uint', 11), 'x')"
+    x = "(('uint', 20), 'x')"
     y = "(('uint', 10), 'y')"
     z = "(('uint', 10), 'z')"
     assert (
         str(b)
         == dedent(
             f"""
-        ('connect', {x}, (('uint', 11), 3))
+        ('connect', {x}, (('uint', 20), 3))
         ('connect', {x}, (('uint', 11), ('+', {y}, {z})))
         ('when', (('uint', 1), ('==', {y}, {z})), (
-            ('connect', {x}, (('uint', 11), 7))
+            ('connect', {x}, (('uint', 20), 7))
         ))
         ('else-when', (('uint', 1), ('>', {y}, {z})), (
-            ('connect', {x}, (('uint', 11), 10))
+            ('connect', {x}, (('uint', 20), 10))
         ))
         ('else', (
-            ('connect', {x}, (('uint', 11), 0))
+            ('connect', {x}, (('uint', 20), 0))
         ))
     """
         ).strip()
@@ -126,12 +127,13 @@ def test_op2():
     """Test operands with 2 arguments"""
 
     b = _setup()
-    x = (("uint", 11), "x")
+    x = (("uint", 20), "x")
+    bigx = (("uint", 1033), "bigx")
     y = (("uint", 10), "y")
     z = (("uint", 10), "z")
     xs = (("sint", 11), "xs")
 
-    def chk(op, v0=y, v1=z, rsize=None):
+    def chk(op, v0=y, v1=z, rsize=None, x=x):
         if isinstance(v0, int):
             v0 = (("uint", -1), v0)
         if isinstance(v1, int):
@@ -139,7 +141,7 @@ def test_op2():
         rsize = rsize or 11
         assert b.code[-1] == (
             "connect",
-            (("uint", 11), "x"),
+            x,
             (("uint", rsize), (op, v0, v1)),
         )
 
@@ -179,8 +181,8 @@ def test_op2():
     b.x = b.y >> 11
     chk(">>", v1=11, rsize=1)
 
-    b.x = b.y << b.z
-    chk("<<", rsize=1033)
+    b.bigx = b.y << b.z
+    chk("<<", rsize=1033, x=bigx)
 
     b.x = 3 << b.z
     chk("<<", v0=3, rsize=5)
@@ -247,19 +249,19 @@ def test_op2():
         "struct",
         ("c", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 0),
         ("d", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 1),
-        ("e", ("sint", 4), 0),
+        ("e", ("sint", 12), 0),
     )
     assert b.code[-1] == (
         "connect",
-        (("sint", 4), (".", (bt, "b"), "e")),
-        (("sint", 12), ("cvt", x)),
+        (("sint", 12), (".", (bt, "b"), "e")),
+        (("sint", 21), ("cvt", x)),
     )
 
     b.b.e = b.cvt(b.b.e)
     assert b.code[-1] == (
         "connect",
-        (("sint", 4), (".", (bt, "b"), "e")),
-        (("sint", 4), ("cvt", (("sint", 4), (".", (bt, "b"), "e")))),
+        (("sint", 12), (".", (bt, "b"), "e")),
+        (("sint", 12), ("cvt", (("sint", 12), (".", (bt, "b"), "e")))),
     )
 
 
@@ -267,13 +269,13 @@ def test_expressions():
     """Test nested expressions"""
 
     b = _setup()
-    x = (("uint", 11), "x")
+    x = (("uint", 20), "x")
     y = (("uint", 10), "y")
     z = (("uint", 10), "z")
     s = (("array", 20, (("uint", 10))), "s")
 
     b.x = ((b.y + 1) // b.z + (1 + b.s[b.x + b.y])) % 32
-    e1 = (("uint", 12), ("+", x, y))
+    e1 = (("uint", 21), ("+", x, y))
     e8 = (("uint", 10), ("[]", s, e1))
     e2 = (("uint", 11), ("+", (("uint", -1), 1), e8))
     e4 = (("uint", 11), ("+", y, (("uint", -1), 1)))
@@ -287,7 +289,7 @@ def test_logop():
     """Test and/or/not"""
 
     b = _setup()
-    x = (("uint", 11), "x")
+    x = (("uint", 20), "x")
     y = (("uint", 10), "y")
     z = (("uint", 10), "z")
 
@@ -317,7 +319,7 @@ def test_bit_slicing():
     b = _setup()
     b.xx = b.x[3:2]
     xx = (("uint", 11), "xx")
-    x = (("uint", 11), "x")
+    x = (("uint", 20), "x")
 
     assert b.code[-1] == (
         "connect",
@@ -349,7 +351,7 @@ def test_array_indexing():
 
     b = _setup()
     xx = (("uint", 11), "xx")
-    x = (("uint", 11), "x")
+    x = (("uint", 20), "x")
     s = (("array", 20, (("uint", 10))), "s")
     s2 = (("array", 2, s[0]), "s2")
     y = (("uint", 10), "y")
@@ -471,3 +473,8 @@ def test_assign_type_checking():
         b.att1 = 3
     with raises(TypeError, match="Cannot assign to input"):
         b.y = 3
+    with raises(
+        TypeError,
+        match=r"Cannot assign non-equivalent type uint\[10\] to uint\[2\]",
+    ):
+        b.inst.i = b.y

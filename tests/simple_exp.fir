@@ -4,7 +4,7 @@ circuit test :
   module test :
     input x : UInt<1>
     input en : UInt<1>
-    output y : UInt<2>
+    output y : UInt<4>
 
     wire w : UInt<3>
 

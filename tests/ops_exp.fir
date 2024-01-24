@@ -7,12 +7,12 @@ circuit ops :
     input c : SInt<8>
     input d : SInt<8>
     output x : UInt<9>[2]
-    output y : SInt<9>[2]
-    output z : SInt<9>[2]
+    output y : SInt<263>[2]
+    output z : SInt<11>[2]
 
 
     x[UInt(0)] <= dshr(a, b)
-    x[UInt(1)] <= dshl(a, b)
+    x[UInt(1)] <= bits(dshl(a, b), 8, 0)
     y[UInt(0)] <= dshr(c, b)
     y[UInt(1)] <= dshl(c, b)
     z[UInt(0)] <= shl(c, 3)

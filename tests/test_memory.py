@@ -25,6 +25,7 @@ def test_base_type_memory():
                                 ("clk", ("clock", 1), 0),
                                 ("data", ("uint", 8), 1),
                             ),
+                            {},
                         ),
                         (
                             "w",
@@ -37,6 +38,7 @@ def test_base_type_memory():
                                 ("data", ("uint", 8), 0),
                                 ("mask", ("uint", 1), 0),
                             ),
+                            {},
                         ),
                         (
                             "rw",
@@ -51,6 +53,7 @@ def test_base_type_memory():
                                 ("wdata", ("uint", 8), 0),
                                 ("wmask", ("uint", 1), 0),
                             ),
+                            {},
                         ),
                     ],
                     "wires": [],

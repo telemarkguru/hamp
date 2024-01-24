@@ -31,7 +31,7 @@ def test_simple():
     m = module("test")
     m.x = input(u1)
     m.en = input(u1)
-    m.y = output(uint[2])
+    m.y = output(uint[4])
     m.w = wire(uint[3])
 
     @m.code
@@ -61,7 +61,7 @@ def test_counter():
 
     @m.function
     def inc(x, delta=1):  # pragma: no cover
-        x.cnt = x.cnt + delta
+        x.cnt = (x.cnt + delta)[w - 1 : 0]
 
     @m.code
     def main(x):  # pragma: no cover
@@ -116,13 +116,13 @@ def test_ops():
     m.c = input(sint[8])
     m.d = input(sint[8])
     m.x = output(uint[9][2])
-    m.y = output(sint[9][2])
-    m.z = output(sint[9][2])
+    m.y = output(sint[263][2])
+    m.z = output(sint[11][2])
 
     @m.code
-    def main(x):  # pragma: no cover
+    def main(x):
         x.x[0] = x.a >> x.b
-        x.x[1] = x.a << x.b
+        x.x[1] = (x.a << x.b)[8:0]
         x.y[0] = x.c >> x.b
         x.y[1] = x.c << x.b
         x.z[0] = x.c << 3

@@ -24,6 +24,7 @@ from ._struct import (
     struct,
 )
 from ._firrtl import generate as generate_firrtl
+from ._builder import build
 
 __all__ = (
     "uint",
@@ -45,5 +46,6 @@ __all__ = (
     "instance",
     "modules",
     "struct",
+    "build",
     "generate_firrtl",
 )
