@@ -1,3 +1,4 @@
 *.fir
 !*_exp.fir
 *.db
+*.v

@@ -5,6 +5,7 @@ from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
 from hamp._db import validate
 from os.path import dirname, abspath
+import os
 from pprint import pprint
 
 
@@ -21,6 +22,8 @@ def _generate_and_check(name, *m):
     code = generate(db)
     with open(f"{_this}/{name}.fir", "w") as fh:
         fh.write(code)
+    if firtool := os.environ.get("FIRTOOL"):
+        os.system(f"{firtool} {_this}/{name}.fir -o {_this}/{name}.v")
     with open(f"{_this}/{name}_exp.fir") as fh:
         assert fh.read() == code
 
