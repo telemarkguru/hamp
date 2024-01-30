@@ -70,7 +70,7 @@ class _Expr:
             error = "Slice MSB must be equal to or larger than LSB"
         if error:
             slicestr = str(slice)[6:-1].replace(", ", ":")
-            raise IndexError(f"{error}: {self._name}[{slicestr}]")
+            raise IndexError(f"{error}: {self._id}[{slicestr}]")
 
     def __getitem__(self, idx) -> "_Expr":
         if isinstance(idx, int):
@@ -459,41 +459,45 @@ class _OrrExpr(_OneOpExpr):
 
 
 class _Var:
-    _name: str
+    _id: Union[str, _Expr]
     _builder: "_CodeBuilder"
     _base: Union["_Var", None]
 
     def __init__(
         self,
-        name: str,
+        id: Union[str, _Expr],
         builder: "_CodeBuilder",
         base: Union["_Var", None] = None,
     ):
-        self._name = name
+        self._id = id
         self._builder = builder
         self._base = base
 
     def _full_name(self, name: str = "") -> str:
         if self._base:
-            return self._base._full_name(self._name)
-        return self._name
+            if isinstance(self._id, str):
+                return self._base._full_name(self._id)
+            return self._base._full_name("")
+        assert isinstance(self._id, str)
+        return self._id
 
 
 class _IntVarExpr(_Expr, _Var):
     def __init__(
         self,
         type: _Int,
-        name: str,
+        id: Union[str, _Expr],
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
         _Expr.__init__(self, type)
-        _Var.__init__(self, name, builder, base)
+        _Var.__init__(self, id, builder, base)
 
-    def expr(self, _=None):
+    def expr(self, _=""):
         if self._base:
-            return self._base.expr(self._name)
-        return (self.type.expr(), self._name)
+            return self._base.expr(self._id)
+        assert isinstance(self._id, str)
+        return (self.type.expr(), self._id)
 
 
 class Access(Enum):
@@ -512,18 +516,18 @@ def _flip_access(a, flip):
 
 
 class _StructVar(_Var):
-    _VARS = set(("_name", "type", "_builder", "_base", "_access"))
+    _VARS = set(("_id", "type", "_builder", "_base", "_access"))
     type: _Struct
 
     def __init__(
         self,
         type: _Struct,
-        name: str,
+        id: Union[str, _Expr],
         access: Access,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
-        super().__init__(name, builder, base)
+        super().__init__(id, builder, base)
         self.type = type
         self._access = access
 
@@ -550,21 +554,23 @@ class _StructVar(_Var):
             )
         self._builder.code.append(("connect", self.expr(name), value.expr()))
 
-    def expr(self, name=""):
-        if not name:
+    def expr(self, id=""):
+        if not id:
             if self._base:
-                return self._base.expr(self._name)
-            return (self.type.expr(), self._name)
-        item = member(self.type, name).expr()
+                return self._base.expr(self._id)
+            return (self.type.expr(), self._id)
+        item = member(self.type, id).expr()
         if self._base:
-            return (item, (".", self._base.expr(self._name), name))
-        return (item, (".", (self.type.expr(), self._name), name))
+            return (item, (".", self._base.expr(self._id), id))
+        return (item, (".", (self.type.expr(), self._id), id))
 
     def _full_name(self, name: str = "") -> str:
         if name:
-            name = f"{self._name}.{name}"
+            name = f".{name}"
         else:
-            name = self._name
+            name = ""
+        if isinstance(self._id, str):
+            name = f"{self._id}{name}"
         if self._base:
             return self._base._full_name(name)
         return name
@@ -575,72 +581,68 @@ class _StructVar(_Var):
 
 class _ArrayVar(_Var):
     type: _Array
-    idx: Union[_Expr, None]
 
     def __init__(
         self,
         type: _Array,
-        name: str,
+        id: Union[str, _Expr],
         access: Access,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
-        super().__init__(name, builder, base)
+        super().__init__(id, builder, base)
         self.type = type
-        self.idx = None
         self.access = access
 
     def _chk_idx(self, idx: int) -> _ConstExpr:
         size = self.type.size
         if not 0 <= idx < size:
             raise IndexError(
-                f"{self._name}[{idx}] is out of range (size={size})"
+                f"{self._id}[{idx}] is out of range (size={size})"
             )
         return _ConstExpr(idx, False)
 
     def __getitem__(self, idx: OpType) -> _Var:
         if isinstance(idx, slice):
-            raise TypeError(f"{self._name} is not a bit-vector")
+            raise TypeError(f"{self._id} is not a bit-vector")
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
-        self.idx = idx
-        return _vartype(self.type.type, "", self._builder, self, self.access)
+        return _vartype(self.type.type, idx, self._builder, self, self.access)
 
     def __setitem__(self, idx: OpType, value: OpType) -> None:
         type = self.type.type
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
-        self.idx = idx
         if self.access == Access.RD:
-            raise TypeError(f"Not allowed to assign to {self._full_name()}")
+            raise TypeError(f"Not allowed to assign to {self._full_name('')}")
         if isinstance(value, int):
             value = _ConstExpr(value, type.signed)
         if not equivalent(type, value.type, False):
             raise TypeError(
                 f"Cannot assign non-equivalent type {value.type} to {type}"
             )
-        self._builder.code.append(("connect", self.expr(""), value.expr()))
+        self._builder.code.append(("connect", self.expr(idx), value.expr()))
 
-    def expr(self, _=None):
+    def expr(self, idx=None):
         if self._base:
-            t, b = self._base.expr(self._name)
+            t, b = self._base.expr(self._id)
         else:
             t = self.type.expr()
-            b = self._name
-        if self.idx is not None:
-            i = self.idx.expr()
+            b = self._id
+        if idx is not None:
+            i = idx.expr()
             rt = self.type.type.expr()
             return (rt, ("[]", (t, b), i))
         else:
             return (t, b)
 
-    def _full_name(self, name: str = "") -> str:
-        if name:
-            name = f"{self._name}[]{name}"
+    def _full_name(self, name=None) -> str:
+        if name is not None:
+            name = f"[]{name}"
         else:
-            name = self._name
-            if self.idx is not None:
-                name += "[]"
+            name = ""
+        if isinstance(self._id, str):
+            name = f"{self._id}{name}"
         if self._base:
             return self._base._full_name(name)
         return name
@@ -650,17 +652,17 @@ class _ArrayVar(_Var):
 
 
 class _InstanceVar(_Var):
-    _VARS = set(("_name", "type", "_builder", "_base"))
+    _VARS = set(("_id", "type", "_builder", "_base"))
     type: _Module
 
     def __init__(
         self,
         type: _Module,
-        name: str,
+        id: str,
         builder: "_CodeBuilder",
         base: Union[_Var, None] = None,
     ):
-        super().__init__(name, builder, base)
+        super().__init__(id, builder, base)
         self.type = type
 
     def __getattr__(self, name: str) -> _Var:
@@ -687,7 +689,7 @@ class _InstanceVar(_Var):
         item = self.type[name]
         if not isinstance(item, _Port) or item.direction != INPUT:
             raise TypeError(
-                f"Cannot assign non-input of instance {self._name}: {name}"
+                f"Cannot assign non-input of instance {self._id}: {name}"
             )
         if isinstance(value, int):
             value = _infer_int(item.type, value)
@@ -699,13 +701,14 @@ class _InstanceVar(_Var):
 
     def expr(self, name):
         item = self.type[name]
-        return (item.type.expr(), (".", "instance", self._name, name))
+        return (item.type.expr(), (".", "instance", self._id, name))
 
     def _full_name(self, name: str = "") -> str:
+        assert isinstance(self._id, str)
         if name:
-            name = f"{self._name}.{name}"
+            name = f"{self._id}.{name}"
         else:
-            name = self._name
+            name = self._id
         return name
 
 
