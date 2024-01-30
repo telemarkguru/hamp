@@ -262,3 +262,42 @@ def test_composit_data_types():
         m.z[2] = m.c2[m.rsel].x
 
     _generate_and_check("data_types", m)
+
+
+def test_functional():
+    m = module("functional")
+    m.i = input(uint[10][5])
+    m.o = output(uint[14])
+
+    @m.code
+    def main(m):
+        m.o = sum(m.i)
+
+    _generate_and_check("functional", m)
+
+
+def test_composit_register():
+    modules.clear()
+
+    @struct
+    class C:
+        r: sint[20]
+        i: sint[20]
+
+    m = module("composit_register")
+    m.clk = input(clock())
+    m.rst = input(async_reset())
+    m.data = register(C)  # , value=dict(r=0, i=0))
+    m.r = input(sint[20])
+    m.i = input(sint[20])
+    m.en = input(u1)
+    m.x = output(sint[40])
+
+    @m.code
+    def main(m):
+        if m.en:
+            m.data.r = m.r
+            m.data.i = m.i
+        m.x = m.data.r * m.data.i
+
+    _generate_and_check("composit_register", m)
