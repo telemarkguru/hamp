@@ -48,6 +48,9 @@ class _Expr:
     def size(self) -> int:
         return self.type.size
 
+    def __len__(self):
+        return self.type.size
+
     def new_type(self, size) -> _Int:
         if isinstance(self.type, _SInt):
             return sint[size]
@@ -566,6 +569,9 @@ class _StructVar(_Var):
             return self._base._full_name(name)
         return name
 
+    def __len__(self):
+        return len(self.type)
+
 
 class _ArrayVar(_Var):
     type: _Array
@@ -638,6 +644,9 @@ class _ArrayVar(_Var):
         if self._base:
             return self._base._full_name(name)
         return name
+
+    def __len__(self):
+        return len(self.type)
 
 
 class _InstanceVar(_Var):

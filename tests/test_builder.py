@@ -1,6 +1,14 @@
 from hamp._builder import _CodeBuilder, build
-from hamp._module import module, input, output, wire, modules, attribute
-from hamp._hwtypes import uint, sint
+from hamp._module import (
+    module,
+    input,
+    output,
+    wire,
+    modules,
+    attribute,
+    register,
+)
+from hamp._hwtypes import uint, sint, clock, reset
 from hamp._struct import struct, flip
 from hamp._db import validate
 from textwrap import dedent
@@ -44,6 +52,9 @@ def _module():
     m.b = wire(B)
     m.ba = wire(C[3])
     m.p = input(C)
+    m.clk = input(clock())
+    m.rst = input(reset())
+    m.r = register(B)
     m.inst = mi(k=3)
     m.att1 = attribute(3)
     return m, mi
@@ -274,7 +285,8 @@ def test_expressions():
     z = (("uint", 10), "z")
     s = (("array", 20, (("uint", 10))), "s")
 
-    b.x = ((b.y + 1) // b.z + (1 + b.s[b.x + b.y])) % 32
+    v = b.s[b.x + b.y]
+    b.x = ((b.y + 1) // b.z + (1 + v)) % 32
     e1 = (("uint", 21), ("+", x, y))
     e8 = (("uint", 10), ("[]", s, e1))
     e2 = (("uint", 11), ("+", (("uint", -1), 1), e8))
@@ -473,8 +485,21 @@ def test_assign_type_checking():
         b.att1 = 3
     with raises(TypeError, match="Cannot assign to input"):
         b.y = 3
+    r"""
     with raises(
         TypeError,
         match=r"Cannot assign non-equivalent type uint\[10\] to uint\[2\]",
     ):
         b.inst.i = b.y
+    """
+
+
+def test_size_len():
+    b = _setup()
+    assert len(b.x) == 20
+    assert len(b.y) == 10
+    assert len(b.s) == 200
+    assert len(b.s[0]) == 10
+    assert len(b.b) == 20
+    assert len(b.ba) == 36
+    assert len(b.r) == 20

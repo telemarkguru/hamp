@@ -40,6 +40,8 @@ def test_hier_struct():
     assert x.b.a.value == 7
 
     assert list(members(Foo)) == [("a", sint[1]), ("b", uint[3])]
+    assert len(Foo) == 4
+    assert len(Bar) == 8
 
 
 def test_flip():

@@ -26,7 +26,8 @@ def test_member_access_module():
     m = mod.module("foo")
     m.x = mod.input(sint[1])
     m["y"] = mod.output(uint[10])
-    assert [x.name for x in m] == ["x", "y"]
+    m["z"] = mod.wire(uint[3][100])
+    assert [x.name for x in m] == ["x", "y", "z"]
     assert m["x"].type == sint[1]
     assert m.y.type == uint[10]
     assert "x" in m
@@ -34,6 +35,7 @@ def test_member_access_module():
     with pytest.raises(AttributeError):
         m.x
     assert "x" not in m
+    assert len(m.z) == 300
 
 
 def test_module_instance():
@@ -101,6 +103,9 @@ def test_module_add_register():
     assert r.clock is m.clk
     assert r.reset is m.rst
     assert r.value == 0
+    assert len(m.clk) == 1
+    assert len(m.rst) == 1
+    assert len(m.reg) == 144
 
 
 def test_module_register_no_clock():

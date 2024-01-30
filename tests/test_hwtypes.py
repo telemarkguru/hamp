@@ -60,6 +60,9 @@ def test_uint_values():
     assert tu(0).value == 0
     assert tu(100000000).value == 100000000
     _assert_value_error(hw._UInt(-1), -1)
+    assert len(t1) == 1
+    assert len(hw.uint(3)) == 2
+    assert len(hw.uint[10](3)) == 10
 
 
 def test_sint_values():
@@ -75,6 +78,9 @@ def test_sint_values():
     _assert_value_error(t2, -4)
     _assert_value_error(t2, 2)
     _assert_value_error(t2, 3)
+    assert len(t1) == 1
+    assert len(hw.sint(-3)) == 2
+    assert len(hw.sint[10](3)) == 10
 
 
 def test_arrays():
@@ -83,6 +89,14 @@ def test_arrays():
     assert repr(a1) == "uint[3][10]"
     assert a1.size == 10
     assert a1.type == hw.uint[3]
+    assert len(a1) == 30
+
+
+def test_clock_reset():
+    t1 = hw.clock()
+    assert len(t1) == 1
+    t2 = hw.reset()
+    assert len(t2) == 1
 
 
 def test_equivalent():

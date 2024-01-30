@@ -219,6 +219,9 @@ class _Port(_DataMember):
         self.direction = direction
         self.attributes = attributes
 
+    def __len__(self):
+        return len(self.type)
+
 
 class _LocalDataMember(_DataMember):
     pass
@@ -232,6 +235,9 @@ class _Wire(_LocalDataMember):
     def __init__(self, type: _HWType, attributes: AttrType):
         self.type = type
         self.attributes = attributes
+
+    def __len__(self):
+        return len(self.type)
 
 
 class _Register(_LocalDataMember):
@@ -252,6 +258,9 @@ class _Register(_LocalDataMember):
         self.reset = reset
         self.value = value
         self.attributes = attributes
+
+    def __len__(self):
+        return len(self.type)
 
     # TODO: Add attributes to registers to make it possible to
     # annotate CSR info to a register

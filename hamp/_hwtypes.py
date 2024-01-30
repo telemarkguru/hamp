@@ -22,6 +22,9 @@ class _HWType:
     def __call__(self, *args, **kwargs):  # pragma: no cover
         assert False
 
+    def __len__(self):  # pragma: no cover
+        assert False
+
 
 class _Clock(_HWType):
     """Clock signal"""
@@ -31,11 +34,17 @@ class _Clock(_HWType):
     def __call__(self, value: int = 0):
         return 0
 
+    def __len__(self):
+        return 1
+
 
 class _Reset(_HWType):
     """Generic reset signal"""
 
     kind = "reset"
+
+    def __len__(self):
+        return 1
 
 
 class _AsyncReset(_Reset):
@@ -66,6 +75,11 @@ class _IntValue:
     def __repr__(self):
         return f"{self.type.kind}[{self.type.size}]({self.value:#x})"
 
+    def __len__(self):
+        if self.type.size == -1:
+            return self.value.bit_length()
+        return len(self.type)
+
 
 class _Int(_HWType):
     """Integer type base class"""
@@ -91,6 +105,9 @@ class _Int(_HWType):
 
     def expr(self):
         return (self.kind, self.size)
+
+    def __len__(self):
+        return self.size
 
 
 class _UInt(_Int):
@@ -155,6 +172,9 @@ class _Array(_HWType):
     def expr(self):
         return ("array", self.size, self.type.expr())
 
+    def __len__(self):
+        return len(self.type) * self.size
+
 
 class _ArrayValue:
     type: _Array
@@ -168,6 +188,9 @@ class _ArrayValue:
 
     def __setitem__(self, i, v):
         self.values[i] = self.type.type(v)
+
+    def __len__(self):
+        return len(self.type)
 
 
 class _IntFactory:
@@ -221,6 +244,13 @@ class _Struct(_HWType):
             if isinstance(x.type, _HWType)
         ]
         return ("struct", *fs)
+
+    def __len__(self):
+        return sum(
+            len(x.type)
+            for x in fields(self.dataclass)
+            if isinstance(x.type, _HWType)
+        )
 
 
 def equivalent(t1, t2, sizes=True) -> bool:
