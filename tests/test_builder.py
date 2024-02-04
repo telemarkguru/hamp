@@ -357,6 +357,9 @@ def test_bit_slicing():
     with raises(TypeError, match=r"Expected constant bit-slice"):
         b.y = b.x[None]
 
+    with raises(IndexError, match=r"Slice MSB must be less or equal to MSB"):
+        b.xx = b.x[20]
+
 
 def test_array_indexing():
     """Test x[y] = z, x = y[z], etc"""

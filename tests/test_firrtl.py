@@ -268,10 +268,12 @@ def test_functional():
     m = module("functional")
     m.i = input(uint[10][5])
     m.o = output(uint[14])
+    m.c = output(uint[4])
 
     @m.code
     def main(m):
         m.o = sum(m.i)
+        m.c = sum(m.i[0])
 
     _generate_and_check("functional", m)
 

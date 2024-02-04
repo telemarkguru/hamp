@@ -68,6 +68,8 @@ class _Expr:
             error = "Step in slice index not allowed"
         elif slice.stop > slice.start:
             error = "Slice MSB must be equal to or larger than LSB"
+        elif slice.stop >= self.size:
+            error = "Slice MSB must be less or equal to MSB"
         if error:
             slicestr = str(slice)[6:-1].replace(", ", ":")
             raise IndexError(f"{error}: {self._id}[{slicestr}]")
