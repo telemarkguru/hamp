@@ -53,8 +53,8 @@ def test_counter():
     w = 10
 
     m = module("test")
-    m.clk = input(clock())
-    m.rst = input(async_reset())
+    m.clk = input(clock)
+    m.rst = input(async_reset)
     m.en = input(u1)
     m.out = output(uint[w])
     m.cnt = register(uint[w], m.clk, m.rst, value=0)
@@ -91,7 +91,7 @@ def test_struct():
         data2: Data[3]
 
     m = module("struct")
-    m.clk = input(clock())
+    m.clk = input(clock)
     m.din = input(Foo)
     m.dout = output(Foo)
     m.sel = input(uint[2])
@@ -287,8 +287,8 @@ def test_composit_register():
         i: sint[20]
 
     m = module("composit_register")
-    m.clk = input(clock())
-    m.rst = input(async_reset())
+    m.clk = input(clock)
+    m.rst = input(async_reset)
     m.data = register(C)  # , value=dict(r=0, i=0))
     m.r = input(sint[20])
     m.i = input(sint[20])

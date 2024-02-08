@@ -29,9 +29,9 @@ def test_sint():
 
 
 def test_resets():
-    x = hw.async_reset()
+    x = hw.async_reset
     assert isinstance(x, hw._AsyncReset)
-    y = hw.sync_reset()
+    y = hw.sync_reset
     assert isinstance(y, hw._SyncReset)
 
 
@@ -93,9 +93,9 @@ def test_arrays():
 
 
 def test_clock_reset():
-    t1 = hw.clock()
+    t1 = hw.clock
     assert len(t1) == 1
-    t2 = hw.reset()
+    t2 = hw.reset
     assert len(t2) == 1
 
 

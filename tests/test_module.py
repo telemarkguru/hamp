@@ -95,8 +95,8 @@ def test_module_function():
 def test_module_add_register():
     mod.modules.clear()
     m = mod.module("foo")
-    m.clk = mod.input(clock())
-    m.rst = mod.input(reset())
+    m.clk = mod.input(clock)
+    m.rst = mod.input(reset)
     m.reg = mod.register(sint[144], value=0)
     r = m.reg
     assert r.type == sint[144]
@@ -118,7 +118,7 @@ def test_module_register_no_clock():
 def test_module_register_no_reset():
     mod.modules.clear()
     m = mod.module("foo")
-    m.clk = mod.input(clock())
+    m.clk = mod.input(clock)
     with pytest.raises(ValueError, match="No reset defined in module foo"):
         m.x = mod.register(uint[2], value=0)
 

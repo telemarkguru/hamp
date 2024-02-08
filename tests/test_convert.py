@@ -69,9 +69,9 @@ def test_if():
 def test_and_or_not():
     modules.clear()
     m = module("test")
-    m.a = input(clock())
+    m.a = input(clock)
     m.b = input(uint[2])
-    m.c = input(reset())
+    m.c = input(reset)
 
     def foo(x):  # pragma: no cover
         if x.a and b:  # noqa: F821

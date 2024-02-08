@@ -41,7 +41,7 @@ def memory(
 
     addr_bits = (depth - 1).bit_length()
     addr_t = uint[addr_bits]
-    clock_t = clock()
+    clock_t = clock
     mtype = wmask_type(type)
 
     m = module("")

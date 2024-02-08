@@ -293,27 +293,10 @@ INPUT = _Direction("input")
 OUTPUT = _Direction("output")
 
 
-def clock() -> _Clock:
-    """Create and return a clock"""
-    return _Clock()
-
-
-def reset() -> _Reset:
-    """Create and return a generic reset, that is converted to a
-    synchronous or asynchonous reset when the design is elaborated
-    """
-    return _Reset()
-
-
-def async_reset() -> _AsyncReset:
-    """Create and return an asynchronous reset"""
-    return _AsyncReset()
-
-
-def sync_reset() -> _SyncReset:
-    """Create and return a synchronous reset"""
-    return _SyncReset()
-
+clock = _Clock()
+reset = _Reset()
+async_reset = _AsyncReset()
+sync_reset = _SyncReset()
 
 uint = _IntFactory(_UInt)
 sint = _IntFactory(_SInt)
