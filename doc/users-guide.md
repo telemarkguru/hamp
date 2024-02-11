@@ -62,6 +62,7 @@ An array of N elements of a type can be declared as:
     some_type[N]
 
 Arrays can be of constructed of any type (arrays, structs and integers).
+An array can be indexed by constants or unsigned integer expressions.
 
 ### Structs
 
@@ -88,9 +89,48 @@ data about the hardware, like sizes.
 
 ### Modules
 
-### Ports
+A public module is created with:
+```Python
+m = module("name")
+```
+
+A module private to another module is created with:
+```Python
+m = module("public_module_name::name")
+```
+A private module can be used by the public module it belongs to as well as by
+other private modules belonging to the same public module.
+
+### Ports and wires
+
+Wires and input and output ports are added to a module as so:
+```Python
+m = module("foo")
+m.a = input(uint[1])
+m.b = output(uint[1])
+m.x = wire(uint[1])
+```
+
+The type of a port or wire can be any valid hardware type.
 
 ### Registers
+
+Registers are added to a module in a similar fashion as wires and ports:
+```Python
+m = module("foo")
+m.clk = input(clock)
+m.rst = input(async_reset)
+m.z1 = register(uint[3])
+m.z1 = register(uint[3], value=1)
+m.z3 = register(uint[3], clock=m.clk, reset=m.rst, value=2)
+```
+Where:
+- z1 is a register without reset. Clock is inferred as the first clock in the
+  module
+- z2 is a register reset to the value 1. Clock and reset are inferred.
+- z3 is a register reset to the value 2. Clock and reset are explicit.
+
+Registers can have any valid hardware type.
 
 ### Logical function
 
@@ -103,7 +143,9 @@ some parts of it will generate hardware.  These are:
   - Assignments to wires, register or output ports.
 
 E.g. a loop is not translated directly, but will result in unrolled RTL code if
-the loop contain any of the translated statements.
+the loop contain any of the translated statements above.
+
+### Expressions
 
 Expressions containing ports, registers or wires are translated into
 expression trees using operator overloading.  These trees are, if used
@@ -142,6 +184,47 @@ reused in multiple places, very much like a macro:
           ...
 ```
 
+Intermediate values within an expression are always sized so that bits and
+precision are never lost. E.g. an add expression yields a result that has one
+more bit than the larger of the two operand.
+
+Bits are only lost explicitly, when assigning to something with a narrower
+type, or using bit slicing.
+
+### Operators and functions
+
+The supported operators and functions are mostly based on what is available in
+FIRRTL, so for the details on each operators exact semantics, refer to the
+FIRRTL specification.
+
+Infix and prefix operators are translated to FIRRTL operations as follows:
+
+| Python operator | FIRRTL operation   |
+| --------------- | ------------------ |
+| +               | add                |
+| -               | sub                |
+| *               | mul                |
+| //              | div                |
+| %               | rem                |
+| ==              | eq                 |
+| !=              | neq                |
+| >               | gt                 |
+| >=              | geq                |
+| <               | lt                 |
+| <=              | leq                |
+| >>              | dshr or shr        |
+| <<              | dshl or shl        |
+| &               | and                |
+| |               | or                 |
+| ^               | xor                |
+| ~               | not                |
+| and             | and  [^1]          |
+| or              | or   [^1]          |
+| not             | not  [^1]          |
+| [h:l]           | bits (if uint/sint)|
+
+[^1]: Each operand is first reduced with a or reduction (orr) if not already of
+  type uint[1].
 
 ## Meta programming
 
