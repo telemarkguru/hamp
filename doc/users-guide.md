@@ -215,7 +215,7 @@ Infix and prefix operators are translated to FIRRTL operations as follows:
 | >>              | dshr or shr        |
 | <<              | dshl or shl        |
 | &               | and                |
-| |               | or                 |
+| \|              | or                 |
 | ^               | xor                |
 | ~               | not                |
 | and             | and  [^1]          |
