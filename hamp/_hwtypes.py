@@ -279,6 +279,8 @@ def equivalent(t1, t2, sizes=True) -> bool:
         if not equivalent(t1.type, t2.type):
             return False
         return True
+    if isinstance(t1, (_Clock, _Reset)):
+        return t1 is t2
     raise TypeError(f"Unsupported type {t1}")
 
 
