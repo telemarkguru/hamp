@@ -3,6 +3,7 @@ from hamp._builder import build
 from hamp._module import module, input, output, wire, register, modules
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
+from hamp._memory import memory, wmask_type
 from hamp._db import validate
 from os.path import dirname, abspath
 import os
@@ -23,7 +24,9 @@ def _generate_and_check(name, *m):
     with open(f"{_this}/{name}.fir", "w") as fh:
         fh.write(code)
     if firtool := os.environ.get("FIRTOOL"):
-        os.system(f"{firtool} {_this}/{name}.fir -o {_this}/{name}.v")
+        assert (
+            os.system(f"{firtool} {_this}/{name}.fir -o {_this}/{name}.v")
+        ) == 0
     with open(f"{_this}/{name}_exp.fir") as fh:
         assert fh.read() == code
 
@@ -303,3 +306,58 @@ def test_composit_register():
         m.x = m.data.r * m.data.i
 
     _generate_and_check("composit_register", m)
+
+
+def test_memory():
+    modules.clear()
+
+    @struct
+    class D:
+        a: uint[2]
+        b: sint[3]
+        c: sint[3][2]
+
+    mask_t = wmask_type(D)
+
+    m = module("memories")
+    m.clk = input(clock)
+    m.addr = input(uint[8])
+    m.we = input(u1)
+    m.re = input(u1)
+    m.ce = input(u1)
+    m.wmode = input(u1)
+    m.din = input(D[2])
+    m.dout = output(D[2])
+    m.ram = memory(D, 256, ["r1"], ["w1"], ["rw1"])
+
+    m.wmask = wire(mask_t)
+
+    @m.code
+    def main(m):
+        r1 = m.ram.r1
+        r1.en = m.re
+        r1.clk = m.clk
+        r1.addr = m.addr
+        m.dout[0] = r1.data
+
+        w1 = m.ram.w1
+        w1.en = m.we
+        w1.clk = m.clk
+        w1.addr = m.addr
+        w1.data = m.din[0]
+        w1.mask = m.wmask
+        m.wmask.a = 1
+        m.wmask.b = 1
+        m.wmask.c[0] = 1
+        m.wmask.c[1] = 1
+
+        rw1 = m.ram.rw1
+        rw1.en = m.ce
+        rw1.clk = m.clk
+        rw1.addr = m.addr
+        rw1.wmode = m.wmode
+        rw1.wdata = m.din[1]
+        rw1.wmask = m.wmask
+        m.dout[1] = rw1.rdata
+
+    _generate_and_check("memories", m.ram.type, m)

@@ -11,6 +11,9 @@ DATABASE:
         }
     }
 
+# The circuit name "mem" is reserved for memories
+
+
 NAME:
     "[A-Za-z_][A-Za-z0-9_]*"
 

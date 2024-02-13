@@ -147,6 +147,23 @@ def _statements(code: list[tuple], lines: list[str]) -> None:
     f(code, "    ")
 
 
+def _memory(name: str, attr: dict, lines: list[str]) -> None:
+    readers = [f"        reader => {x}" for x in attr["_readers"]]
+    writers = [f"        writer => {x}" for x in attr["_writers"]]
+    readwriters = [f"        readwriter => {x}" for x in attr["_readwriters"]]
+    lines += [
+        f"    mem {name} :",
+        f"        data-type => {_type(attr['_type'])}",
+        f"        depth => {attr['_depth']}",
+        *readers,
+        *writers,
+        *readwriters,
+        f"        read-latency => {attr.get('_rlat', 1)}",
+        f"        write-latency => {attr.get('_wlat', 1)}",
+        "        read-under-write => undefined",
+    ]
+
+
 def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
     """Generate FIRRTL code for module"""
     lines += ["", f"  module {mname} :"]
@@ -161,6 +178,10 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
             f"    reg {r[0]} : {_type(r[1])}, {r[2]}{_reset(r[3], r[1])}"
         )
     for i in m["instances"]:
+        if i[1] == "mem":
+            attr = db["circuits"][i[1]][i[2]]["attributes"]
+            _memory(i[0], attr, lines)
+            continue
         lines.append(f"    inst {i[0]} of {i[2]}")
     lines.append("")
     _statements(m["code"], lines)
@@ -168,6 +189,8 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
 
 
 def _circuit(name: str, db: DB, lines: list[str]) -> None:
+    if name == "mem":
+        return
     lines.append(f"circuit {name} :")
     modules = db["circuits"][name]
     for mname in modules:

@@ -60,7 +60,14 @@ def test_base_type_memory():
                     "registers": [],
                     "instances": [],
                     "code": [],
-                    "attributes": {"_ismem": 1},
+                    "attributes": {
+                        "_ismem": 1,
+                        "_depth": 32,
+                        "_type": ("uint", 8),
+                        "_readers": ["r"],
+                        "_writers": ["w"],
+                        "_readwriters": ["rw"],
+                    },
                 }
             }
         }

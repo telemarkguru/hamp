@@ -3,7 +3,7 @@ Memory instance creation
 """
 
 from ._hwtypes import _HWType, uint, u1, clock, _Int, _Struct, _Array
-from ._module import _Instance, module, input, attribute
+from ._module import _Instance, module, input, attribute, unique
 from ._struct import struct, flip, members
 
 
@@ -44,8 +44,13 @@ def memory(
     clock_t = clock
     mtype = wmask_type(type)
 
-    m = module("")
+    m = module(unique("mem"))
     m._ismem = attribute(1)
+    m._type = attribute(type.expr())
+    m._depth = attribute(depth)
+    m._readers = attribute(readers)
+    m._writers = attribute(writers)
+    m._readwriters = attribute(readwriters)
 
     if readers:
 
