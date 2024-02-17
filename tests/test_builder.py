@@ -506,3 +506,5 @@ def test_size_len():
     assert len(b.b) == 20
     assert len(b.ba) == 36
     assert len(b.r) == 20
+    z = (b.y + b.z + b.b.c.a) >> 3
+    assert len(z) == 12 - 3

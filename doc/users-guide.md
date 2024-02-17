@@ -176,12 +176,18 @@ Also, sub-expressions can be stored in plain Python variables and be
 reused in multiple places, very much like a macro:
 
 ```Python
-   ...
-   @m.code
-   def main(m):
-       a = (m.x + m.y) // 2
-       if a > 3 and a < 100:
-          ...
+    ...
+    @m.code
+    def main(m):
+        a = (m.x + m.y) // 2
+        if len(a) > 10:  # more than 10 bit wide expression, add 1
+            a += 1
+        if a > 3 and a < 100:
+            ...
+
+        z = sum(a * b for a, b in zip(m.a, m.b))
+        assert len(z) <= len(m.dp)  # do not loose bits
+        m.dp = z
 ```
 
 Intermediate values within an expression are always sized so that bits and
@@ -223,8 +229,8 @@ Infix and prefix operators are translated to FIRRTL operations as follows:
 | not             | not  [^1]          |
 | [h:l]           | bits (if uint/sint)|
 
-[^1]: Each operand is first reduced with a or reduction (orr) if not already of
-  type uint[1].
+[^1]: Each operand is first reduced with an or reduction (orr) if not already
+      of type uint[1].
 
 ## Meta programming
 
