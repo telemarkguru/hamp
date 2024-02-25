@@ -3,7 +3,6 @@
 from ._ast import parse_func
 import ast
 from typing import Tuple, Any, Dict, Callable
-from ._module import _Module, _DataMember
 
 
 def _member_func_call(var: str, memb: str, params: Tuple[Any, ...]):
@@ -39,10 +38,11 @@ class _Replacer(ast.NodeTransformer):
     and logical expressions (and/or/not) with function calls
     """
 
-    def __init__(self, var: str, module: _Module):
+    def __init__(self, var: str, module: dict):
         super().__init__()
         self.var = var
         self.module = module
+        self.data = module["data"]
         self.in_attr = False
         self.hw_types = 0
 
@@ -89,15 +89,15 @@ class _Replacer(ast.NodeTransformer):
         if isinstance(node.value, ast.Name):
             if (
                 node.value.id == self.var
-                and node.attr in self.module
-                and isinstance(self.module[node.attr], _DataMember)
+                and node.attr in self.data
+                and self.data[node.attr][0] != "attribute"
             ):
                 self.hw_types += 1
         self.in_attr = False
         return node
 
 
-def _replace(tree: ast.AST, var: str, module: _Module):
+def _replace(tree: ast.AST, var: str, module: dict):
     tree = ast.fix_missing_locations(_Replacer(var, module).visit(tree))
     return tree
 
@@ -119,7 +119,14 @@ def _closure_locals(func: Callable) -> Dict[str, Any]:
     return {}
 
 
-def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
+def _restore_empty_lines(source, empty_lines):
+    lines = source.splitlines()
+    for i in empty_lines:
+        lines.insert(i, "")
+    return "\n".join(lines)
+
+
+def convert(func: Callable, module: dict) -> Tuple[Callable, str]:
     """Convert function to code generator, and return converted function
 
     If statements with hardware expressions are replaced with
@@ -127,13 +134,14 @@ def convert(func: Callable, module: _Module) -> Tuple[Callable, str]:
 
     and/or/not eppressions are replaced with and_expr/or_expr/no_expr calls.
     """
-    tree = parse_func(func)
+    tree, empty_lines = parse_func(func)
     var = func.__code__.co_varnames[0]
     dtree = _replace(tree, var, module)
-    srccode = ast.unparse(dtree)
+    srccode = _restore_empty_lines(ast.unparse(dtree), empty_lines)
     # Remove @xx.code decorator:
     start = srccode.find("def ")
     srccode = srccode[start:]
+
     file = func.__code__.co_filename
     line = func.__code__.co_firstlineno + 1
     code = compile(srccode, file, "exec")

@@ -33,12 +33,12 @@ circuit memories :
     ram.w1.mask <= wmask
     wmask.a <= UInt<1>(1)
     wmask.b <= UInt<1>(1)
-    wmask.c[UInt(0)] <= UInt(1)
-    wmask.c[UInt(1)] <= UInt(1)
+    wmask.c[UInt(0)] <= UInt<1>(1)
+    wmask.c[UInt<1>(1)] <= UInt<1>(1)
     ram.rw1.en <= ce
     ram.rw1.clk <= clk
     ram.rw1.addr <= addr
     ram.rw1.wmode <= wmode
-    ram.rw1.wdata <= din[UInt(1)]
+    ram.rw1.wdata <= din[UInt<1>(1)]
     ram.rw1.wmask <= wmask
-    dout[UInt(1)] <= ram.rw1.rdata
+    dout[UInt<1>(1)] <= ram.rw1.rdata

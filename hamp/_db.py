@@ -1,113 +1,45 @@
 """
 Database
 Stores module data
-
-Format:
-
-"circuits": {
-    "<name>": {
-        "<module-name>": {
-            "ports": [
-                ("port-name", DIRECTION, TYPE, ATTRIBUTES*),
-                ...
-            ],
-            "wires": [
-                ("wire-name", TYPE, ATTRIBUTES*),
-                ...
-            ],
-            "registers": [
-                ("register-name", TYPE, CLOCK, RESET, ATTRIBUTES*),
-                ...
-            ],
-            "instances": [
-                ("instance-name", "circuit-name", "module-name", ATTRIBUTES*),
-                ...
-            ],
-            "code": [
-                STATEMENT,
-                ...
-            ],
-        },
-        ...
-    },
-    ...
-}
-
-
-DIRECTION: "input" or "output"
-TYPE:
-    ("uint", WIDTH)
-    ("sint", WIDTH)
-    ("array", SIZE, TYPE)
-    ("struct",
-        ("field-name", TYPE, FLIP),
-        ...
-    )
-WIDHT: -1 or non-zero positive integer.  -1 means unsized.
-SIZE: non-zero positive integer
-FLIP: 1 to mark flip, 0 otherwise
-
-CLOCK:
-    signal-name
-
-RESET:
-    0
-    (signal-name, value)
-
-STATEMENT:
-    ("connect", VARIABLE, EXPRESSION, ANNOTATION*)
-    ("when", EXPRESSION,
-        (
-            STATEMENT,
-            ...,
-        ),
-        ANNOTATION*
-    )
-    ("else-when", EXPRESSION,
-        (
-            STATEMENT,
-            ...,
-        ),
-        ANNOTATION*
-    )
-    ("else",
-        (
-            STATEMENT,
-            ...,
-        ),
-        ANNOTATION*
-    )
-
-VARIABLE:
-    (TYPE, "variable-name")
-    (TYPE, (".", VARIABLE, "field-name"))  # VARIABLE must have struct type
-    (TYPE, ("[]", VARIABLE, EXPRESSION))  # VARIABLE must have array type
-                                          # EXPRESSION must have uint type
-
-EXPRESSION:
-    VARIABLE,
-    (TYPE, (OP, EXPRESSION, EXPRESIION*))  # EXPRESIION must be uint or sint
-                                           # TYPE is uint or sint
-    (TYPE, VALUE)
-
-OP:
-    "+", "-", ...
-
-VALUE:
-    INTEGER,
-    [VALUE, ...]  # array value
-    {"field-name": VALUE, ...}  # struct value
-
 """
-
 
 import re
 from typing import Union
 
+TL = Union[tuple, list]
 DB = dict[str, dict]
 VAL = Union[str, tuple, int]
 VAR = Union[str, tuple]
 VARS = dict[str, tuple]
+DATA = dict[str, TL]
+MODULE = dict[str, Union[list[str], DATA]]
+NL = list[str]
+ATTR = dict[str, Union[str, int, dict, list]]
+
+default: DB = {"circuits": {}}
+
+
+def create() -> DB:
+    """Create empty DB"""
+    return {"circuits": {}}
+
+
+def create_module(db: DB, circuit: str, module: str) -> dict:
+    """Create empty module, add to DB and return it"""
+    circ = db["circuits"].setdefault(circuit, {})
+    if module in circ:
+        raise NameError(f"Module {circuit}::{module} already defined")
+    m = circ[module] = {
+        "input": [],
+        "output": [],
+        "wire": [],
+        "register": [],
+        "instance": [],
+        "attribute": [],
+        "data": {},
+        "code": [],
+    }
+    return m
 
 
 def validate(db: DB) -> None:
@@ -144,30 +76,59 @@ def _validate_module(name: str, items: DB, db: DB) -> None:
     """Validate module entry"""
 
     vars = {"module": name}
+    data = items["data"]
+    data_cnt = 0
     for m in items.items():
         match m:
-            case ("ports", list(ports)):
-                _validate_ports(name, ports, vars)
-            case ("wires", list(wires)):
-                _validate_wires(name, wires, vars)
-            case ("registers", list(registers)):
-                _validate_registers(name, registers, vars)
-            case ("instances", list(instances)):
-                _validate_instances(name, instances, vars, db)
+            case ("data", dict(_)):
+                pass
+            case ("input", list(ports)):
+                _validate_data(name, "input", ports, data, vars)
+                data_cnt += len(ports)
+            case ("output", list(ports)):
+                _validate_data(name, "output", ports, data, vars)
+                data_cnt += len(ports)
+            case ("wire", list(wires)):
+                _validate_data(name, "wire", wires, data, vars)
+                data_cnt += len(wires)
+            case ("register", list(registers)):
+                _validate_registers(name, registers, data, vars)
+                data_cnt += len(registers)
+            case ("instance", list(instances)):
+                _validate_instances(name, instances, data, vars, db)
+                data_cnt += len(instances)
             case ("code", list(statements)):
                 _validate_code(name, statements, vars)
-            case ("attributes", dict(attributes)):
-                _validate_attributes(attributes)
+            case ("attribute", list(attributes)):
+                _validate_module_attributes(name, attributes, data)
+                data_cnt += len(attributes)
             case _:
                 raise ValueError(f"Malformed item in module {name}: {m}")
+    if data_cnt != len(data):
+        raise ValueError(
+            f"Malformed data section in module {name}: {data_cnt} {len(data)}"
+        )
 
 
-def _validate_attributes(attributes) -> None:
-    if isinstance(attributes, list):
-        for x in attributes:
-            _validate_attributes(x)
+def _validate_module_attributes(name, attributes, data) -> None:
+    for aname in attributes:
+        _validate_name(aname)
+        a = data[aname]
+        match a:
+            case ("attribute", value):
+                _validate_attribute_value(value)
+            case _:
+                raise ValueError(
+                    f"Malformed attribute entry in module {name}: {a}"
+                )
+
+
+def _validate_attributes(*attributes: ATTR) -> None:
+    if not attributes:
         return
-    for k, v in attributes.items():
+    if len(attributes) > 1:
+        raise ValueError(f"Surplus attribute data: {list(attributes[1:])}")
+    for k, v in attributes[0].items():
         _validate_name(k)
         _validate_attribute_value(v)
 
@@ -194,53 +155,64 @@ def _validate_attribute_value(v):
             raise ValueError(f"Malformed attribute value: {v}")
 
 
-def _validate_ports(name: str, ports: list[tuple], vars: VARS) -> None:
-    for p in ports:
+def _validate_data(
+    name: str, kind: str, names: NL, data: DATA, vars: VARS
+) -> None:
+    for pname in names:
+        _validate_name(pname)
+        p = data[pname]
         match p:
-            case (str(pname), "input", type, *attributes):
+            case (str(k), type, *attributes) if k == kind:
                 _validate_type(type)
-                _validate_attributes(attributes)
-                vars[pname] = (type, "input", attributes)
-            case (str(pname), "output", type, *attributes):
-                _validate_type(type)
-                _validate_attributes(attributes)
-                vars[pname] = (type, "output", attributes)
+                _validate_attributes(*attributes)
+                vars[pname] = (type, kind, attributes or {})
             case _:
-                raise ValueError(f"Malformed port entry in module {name}: {p}")
+                raise ValueError(
+                    f"Malformed {kind} entry in module {name}: {p}"
+                )
 
 
-def _validate_wires(name: str, wires: list[tuple], vars: VARS) -> None:
-    for w in wires:
-        match w:
-            case (str(wname), type, *attributes):
-                _validate_type(type)
-                _validate_attributes(attributes)
-                vars[wname] = (type, "wire", attributes)
-            case _:
-                raise ValueError(f"Malformed wire entry in module {name}: {w}")
+_clk_t = ("clock", 1)
+_rst_types = (("reset", 1), ("async_reset", 1), ("uint", 1))
 
 
-def _validate_registers(name: str, registers: list[tuple], vars: VARS) -> None:
-    value: Union[tuple, int]
-    reset: tuple
-    for r in registers:
+def _validate_registers(
+    name: str, registers: NL, data: DATA, vars: VARS
+) -> None:
+    for rname in registers:
+        _validate_name(rname)
+        r = data[rname]
         match r:
-            case (str(rname), type, clk, 0, *attributes):
+            case ("register", type, str(clk), 0, *attributes):
                 _validate_type(type)
-                _validate_var(("clock", 1), clk, vars)
-                _validate_attributes(attributes)
-                vars[rname] = (type, "register", attributes, clk, 0)
-            case (str(rname), type, clk, (reset, value), *attributes):
+                _validate_var(_clk_t, clk, vars)
+                _validate_attributes(*attributes)
+                vars[rname] = (type, "register", attributes or {}, clk, 0)
+            case ("register", type, str(clk), (str(rst), value), *attributes):
                 _validate_type(type)
-                _validate_var(("clock", 1), clk, vars)
-                _validate_attributes(attributes)
+                _validate_var(_clk_t, clk, vars)
+                if rst not in vars:
+                    raise ValueError(
+                        f"Reset signal {rst} not defined in module {name}"
+                    )
+                for rst_type in _rst_types:
+                    try:
+                        _validate_var(rst_type, rst, vars)
+                        break
+                    except ValueError:
+                        pass
+                else:
+                    raise ValueError(
+                        f"Bad register reset type: {vars[rst][0]}"
+                    )
                 _validate_value(type, value, vars)
+                _validate_attributes(*attributes)
                 vars[rname] = (
                     type,
                     "register",
-                    attributes,
+                    attributes or {},
                     clk,
-                    (reset, value),
+                    (rst, value),
                 )
             case _:
                 raise ValueError(
@@ -248,19 +220,27 @@ def _validate_registers(name: str, registers: list[tuple], vars: VARS) -> None:
                 )
 
 
+def _portmap(module):
+    return {
+        **{n: (module["data"][n][1], "input") for n in module["input"]},
+        **{n: (module["data"][n][1], "output") for n in module["output"]},
+    }
+
+
 def _validate_instances(
-    name: str, instances: list[tuple], vars: VARS, db: DB
+    name: str, instances: NL, data: DATA, vars: VARS, db: DB
 ) -> None:
-    for i in instances:
+    for iname in instances:
+        _validate_name(iname)
+        i = data[iname]
         match i:
-            case (str(iname), str(cname), str(mname), *attributes):
-                _validate_attributes(attributes)
+            case ("instance", ("instance", str(cn), str(mn)), *attributes):
+                _validate_attributes(*attributes)
                 try:
-                    m = db["circuits"][cname][mname]
+                    m = db["circuits"][cn][mn]
                 except KeyError:
-                    raise ValueError(f"No module named {cname}::{mname} found")
-                portmap = {n: (t, d) for n, d, t, *_ in m["ports"]}
-                vars[iname] = ("instance", cname, mname, portmap)
+                    raise ValueError(f"No module named {cn}::{mn} found")
+                vars[iname] = ("instance", cn, mn, _portmap(m))
             case _:
                 raise ValueError(
                     f"Malformed instance entry in module {name}: {i}"
@@ -278,18 +258,18 @@ def _validate_code(name: str, statements: list[tuple], vars: VARS) -> None:
                 _validate_type(t1)
                 _validate_var(t1, var, vars)
                 _validate_value(t2, val, vars)
-                _validate_attributes(attributes)
+                _validate_attributes(*attributes)
             case ("when", (("uint", 1), val), stmnts, *attributes):
                 _validate_value(("uint", 1), val, vars)
                 _validate_code(name, stmnts, vars)
-                _validate_attributes(attributes)
+                _validate_attributes(*attributes)
             case ("else-when", (("uint", 1), val), stmnts, *attributes):
                 _validate_value(("uint", 1), val, vars)
                 _validate_code(name, stmnts, vars)
-                _validate_attributes(attributes)
+                _validate_attributes(*attributes)
             case ("else", stmnts, *attributes):
                 _validate_code(name, stmnts, vars)
-                _validate_attributes(attributes)
+                _validate_attributes(*attributes)
             case _:
                 raise ValueError(
                     f"Malformed statement in module {name}: {statement}"
@@ -299,10 +279,10 @@ def _validate_code(name: str, statements: list[tuple], vars: VARS) -> None:
 def _validate_type(type: tuple) -> None:
     match type:
         case ("uint", int(bits)):
-            if not (bits > 0 or bits == -1):
+            if not (bits >= 0):
                 raise ValueError(f"Bad uint size: {bits}")
         case ("sint", int(bits)):
-            if not (bits > 0 or bits == -1):
+            if not (bits >= 0):
                 raise ValueError(f"Bad sint size: {bits}")
         case ("array", int(size), type):
             if size < 1:
@@ -360,8 +340,8 @@ def _validate_var(type: tuple, value, vars: VARS) -> None:
             _validate_type(at)
             _validate_var(at, v, vars)
             _validate_value(("uint", b), i, vars)
-        case (".", "instance", str(iname), str(port)):
-            _validate_instance_port(type, iname, port, vars)
+        case (".", (("instance", str(cn), str(mn)), str(iname)), str(port)):
+            _validate_instance_port(type, cn, mn, iname, port, vars)
         case _:
             raise ValueError(f"Malformed variable {value} of type {type}")
 
@@ -405,11 +385,15 @@ def _validate_value(type: tuple, value, vars: VARS) -> None:
 
 
 def _validate_instance_port(
-    type: tuple, name: str, port: str, vars: VARS
+    type: tuple, cn: str, mn: str, name: str, port: str, vars: VARS
 ) -> None:
     if name not in vars or vars[name][0] != "instance":
         raise ValueError(f"Module {vars['module']} has no instance {name}")
     cname, mname, portmap = vars[name][1:5]
+    if cname != cn or mname != mn:
+        raise ValueError(
+            f"Inconsistent module names {cn}::{mn} vs {cname}::{mname}"
+        )
     if port not in portmap:
         raise ValueError(f"Module {cname}::{mname} has no port {port}")
     ptype, pdir = portmap[port]

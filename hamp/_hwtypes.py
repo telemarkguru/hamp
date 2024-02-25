@@ -2,206 +2,219 @@
 Hardware modelling types
 """
 
-from typing import Dict, Union, Callable
-from dataclasses import fields
+from typing import Dict, Union
+from ._show import show_type
+
+
+def bitsize(type: Union[tuple, list]) -> int:
+    match type:
+        case ("uint", int(x)):
+            return x
+        case ("sint", int(x)):
+            return x
+        case ("clock", 1) | ("reset", 1) | ("async_reset", 1):
+            return 1
+        case ("array", int(x), type):
+            return x * bitsize(type)
+        case ("struct", *fields):
+            return sum(bitsize(x[1]) for x in fields)
+        case _:
+            raise ValueError(f"Malformed type: {type}")
+
+
+def equal(t1: Union[tuple, list], t2: Union[tuple, list], sizes=True) -> bool:
+    match t1, t2:
+        case ("uint", int(x)), ("uint", int(y)):
+            return not sizes or x == y
+        case ("sint", int(x)), ("sint", int(y)):
+            return not sizes or x == y
+        case ("clock", 1), ("clock", 1):
+            return True
+        case ("reset", 1), ("reset", 1):
+            return True
+        case ("async_reset", 1), ("async_reset", 1):
+            return True
+        case ("array", int(x), t1), ("array", int(y), t2):
+            return x == y and equal(t1, t2)
+        case ("struct", *fields1), ("struct", *fields2):
+            return len(fields1) == len(fields2) and all(
+                t1[0] == t2[0] and equal(t1[1], t2[1])
+                for t1, t2 in zip(fields1, fields2)
+            )
+        case _:
+            return False
 
 
 class _HWType:
     """Base class for all hardware modelling types"""
 
-    signed: bool
-    kind: str
+    _bitsize: int
+    _maxval: int
+    _minval: int
+    expr: Union[tuple, list]
 
-    def __getitem__(self, size: int) -> "_Array":
+    def __init__(self, *params):
+        if len(params) == 1:
+            self.expr = params[0]
+        else:
+            self.expr = params
+        self._bitsize = -1  # Unknonw
+
+    def __getitem__(self, size: int) -> "_HWType":
         """Create array type"""
-        return _Array(self, size)
+        return hwtype("array", size, self.expr)
 
-    def expr(self):
-        return (self.kind, 1)
-
-    def __call__(self, *args, **kwargs):  # pragma: no cover
-        assert False
-
-    def __len__(self):  # pragma: no cover
-        assert False
-
-
-class _Clock(_HWType):
-    """Clock signal"""
-
-    kind = "clock"
-
-    def __call__(self, value: int = 0):
-        return 0
-
-    def __len__(self):
-        return 1
-
-
-class _Reset(_HWType):
-    """Generic reset signal"""
-
-    kind = "reset"
-
-    def __len__(self):
-        return 1
-
-
-class _AsyncReset(_Reset):
-    """Asynchronous reset signal"""
-
-    kind = "async_reset"
-
-
-class _SyncReset(_Reset):
-    """Synchronous reset signal"""
-
-    kind = "sync_reset"
-
-
-class _IntValue:
-    """Integer value"""
-
-    def __init__(self, value: int, type: "_Int"):
-        self.value = value
-        self.type = type
-
-    # TODO: methods to manipulate value to it becomes useful for creating
-    # constants and meta-data
-
-    def expr(self):
-        return (self.type.expr(), self.value)
-
-    def __repr__(self):
-        return f"{self.type.kind}[{self.type.size}]({self.value:#x})"
-
-    def __len__(self):
-        if self.type.size == -1:
-            return self.value.bit_length()
-        return len(self.type)
-
-
-class _Int(_HWType):
-    """Integer type base class"""
-
-    signed: bool
-    _minval: Union[int, None]
-    _maxval: Union[int, None]
-    _set_min_max: Callable[[int], None]
-
-    def __init__(self, size: int = 1):
-        self.size = size
-        self._set_min_max(size)
-
-    def __call__(self, value: int = 0):
-        if (self._minval is None or value >= self._minval) and (
-            self._maxval is None or value <= self._maxval
-        ):
-            return _IntValue(value, self)
-        raise ValueError(f"{self.kind}[{self.size}] cannot hold value {value}")
-
-    def __repr__(self):
-        return f"{self.kind}[{self.size}]"
-
-    def expr(self):
-        return (self.kind, self.size)
-
-    def __len__(self):
-        return self.size
-
-
-class _UInt(_Int):
-    """Unsigned integer"""
-
-    kind = "uint"
-    signed = False
-
-    def _set_min_max(self, size: int):
-        self._minval = 0
-        if size > 0:
-            self._maxval = (1 << size) - 1
+    def __getattr__(self, field: str) -> "_HWType":
+        """Get field type of struct"""
+        if self.kind == "struct":
+            for n, t, _ in self.expr[1:]:
+                if field == n:
+                    return hwtype(t)
+            raise AttributeError(f"Struct has no field {field}")
         else:
-            self._maxval = None
+            raise TypeError(f"Cannot get field from {self.kind}")
 
+    def __len__(self):
+        if self._bitsize > -1:
+            return self._bitsize
+        self._bitsize = bitsize(self.expr)
+        return self._bitsize
 
-class _SInt(_Int):
-    """Signed integer"""
+    def __eq__(self, x):
+        return equal(self.expr, x.expr)
 
-    kind = "sint"
-    signed = True
+    @property
+    def kind(self):
+        return self.expr[0]
 
-    def _set_min_max(self, size):
-        if size > 0:
-            self._minval = -(1 << (self.size - 1))
-            self._maxval = (1 << self.size - 1) - 1
+    @property
+    def type(self):
+        """return underlying type of array"""
+        if self.kind == "array":
+            return hwtype(self.expr[2])
         else:
-            self._minval = self._maxval = None
+            raise TypeError(f"Cannot get underlaying type of {self.kind}")
 
+    @property
+    def size(self):
+        if self.kind == "array":
+            return self.expr[1]
+        else:
+            raise TypeError(f"Cannot get size of {self.kind}, use len()")
 
-class _Array(_HWType):
-    kind = "array"
-    type: _HWType
-    size: int
+    @property
+    def signed(self):
+        return self.kind == "sint"
 
-    def __init__(self, type: _HWType, size: int):
-        self.type = type
-        self.size = size
-
-    def __getitem__(self, size: int) -> "_Array":
-        t0 = _Array(self, size)
-        t = t0
-        # Rotate sizes:
-        while isinstance(t.type, _Array):
-            t.size = t.type.size
-            t = t.type
-        t.size = size
-        return t0
+    def __str__(self):
+        return show_type(self.expr)
 
     def __repr__(self):
-        sizes = [self.size]
-        t = self.type
-        if isinstance(t, _Array):
-            sizes.append(t.size)
-            t = t.type
-        dim = "".join(f"[{x}]" for x in sizes)
-        return f"{repr(t)}{dim}"
+        return show_type(self.expr)
 
-    def __call__(self):
-        return _ArrayValue(self)
-
-    def expr(self):
-        return ("array", self.size, self.type.expr())
-
-    def __len__(self):
-        return len(self.type) * self.size
+    def __call__(self, *args, **kwargs):
+        return hwvalue(self.expr, *args, **kwargs)
 
 
-class _ArrayValue:
-    type: _Array
+_hwtype_cache: dict[int, _HWType] = {}
 
-    def __init__(self, type: _Array):
-        self.type = type
-        self.values = [type.type() for _ in range(type.size)]
 
-    def __getitem__(self, i: int):
-        return self.values[i]
+def hwtype(*expr) -> _HWType:
+    """
+    Create hwtype from expression tuple.
+    Use caching on id of tuple.
+    """
+    if len(expr) > 1:
+        h = _HWType(*expr)
+        eid = id(h.expr)
+        _hwtype_cache[eid] = h
+        return h
+    eid = id(expr[0])
+    if h := _hwtype_cache.get(eid):
+        return h
+    h = _hwtype_cache[eid] = _HWType(*expr)
+    return h
 
-    def __setitem__(self, i, v):
-        self.values[i] = self.type.type(v)
 
-    def __len__(self):
-        return len(self.type)
+_min_max_cache: dict[tuple, tuple[int, int]] = {}
+
+
+def _min_max(type: (str, int)) -> (int, int):
+    if x := _min_max_cache.get(type):
+        return x
+    size = type[1]
+    if type[0] == "uint":
+        minv = 0
+        if size > 0:
+            maxv = (1 << size) - 1
+        else:
+            maxv = None
+    else:
+        if size > 0:
+            maxv = (1 << (size - 1)) - 1
+            minv = -maxv - 1
+        else:
+            maxv = None
+            minv = None
+    _min_max_cache[type] = minv, maxv
+    return minv, maxv
+
+
+def hwvalue(type: tuple, *args, **kwargs):
+    """
+    Return value for given type
+    """
+    k = type[0]
+    if k == "uint":
+        value = args[0] if args else 0
+        minv, maxv = _min_max(type)
+        if value < minv or maxv is not None and value > maxv:
+            size = type[1]
+            raise ValueError(f"uint[{size}] cannot hold the value {value:#x}")
+    elif k == "sint":
+        value = args[0] if args else 0
+        minv, maxv = _min_max(type)
+        if minv is not None and (value < minv or value > maxv):
+            size = type[1]
+            raise ValueError(f"sint[{size}] cannot hold the value {value:#x}")
+    elif k == "array":
+        t = type[2]
+        s = type[1]
+        args = args[:s]
+        value = [hwvalue(t, x) for x in args] + [
+            hwvalue(t) for _ in range(s - len(args))
+        ]
+    elif k == "struct":
+        if args and isinstance(args[0], dict):
+            kw = args[0]
+            kw.update(kwargs)
+        else:
+            kw = kwargs
+        value = {
+            k: hwvalue(t, v) if (v := kw.get(k)) else hwvalue(t)
+            for k, t, _ in type[1:]
+        }
+    else:
+        value = args and args[0] or 0
+        if value not in (0, 1):
+            raise ValueError(f"{k} cannot hold the value {value:#x}")
+    return value
 
 
 class _IntFactory:
     """Creates intger types"""
 
-    def __init__(self, int_type: type[_Int]):
-        self.type: type[_Int] = int_type
-        self.types: Dict[int, _Int] = {}
-        self.unsized: _Int = int_type(-1)
+    def __init__(self, kind: str):
+        self.kind = kind
+        self.types: Dict[int, _HWType] = {}
+        self.unsized = hwtype(kind, 0)
+        self.unsized._maxval = None
+        if kind == "uint":
+            self.unsized._minval = 0
+        else:
+            self.unsized._minval = None
 
-    def __getitem__(self, size: int):
+    def __getitem__(self, size: int) -> _HWType:
         """Return integer type of given size.
         Usage examples:
             u1 = uint[1]  # u1 is the unsigned 1 bit integer type
@@ -210,8 +223,13 @@ class _IntFactory:
         """
         if t := self.types.get(size):
             return t
-        t = self.type(size)
-        self.types[size] = t
+        t = self.types[size] = hwtype(self.kind, size)
+        if self.kind == "uint":
+            t._maxval = (1 << size) - 1
+            t._minval = 0
+        else:
+            t._maxval = (1 << (size - 1)) - 1
+            t._minval = -t._maxval - 1
         return t
 
     def __call__(self, value: int = 0):
@@ -219,87 +237,21 @@ class _IntFactory:
         Example:
             uint(4)  # Unsized unsigned integer value of 4
         """
-        return self.unsized(value)
-
-
-class _Struct(_HWType):
-    """Struct type"""
-
-    kind = "struct"
-
-    def __init__(self, dataclass):
-        self.dataclass = dataclass
-
-    def __getattr__(self, x):
-        return getattr(self.dataclass, x)
-
-    def __call__(self, *args, **kwargs):
-        return self.dataclass(*args, **kwargs)
-
-    def expr(self):
-        flips = self.dataclass.__flips__
-        fs = [
-            (x.name, x.type.expr(), int(x.name in flips))
-            for x in fields(self.dataclass)
-            if isinstance(x.type, _HWType)
-        ]
-        return ("struct", *fs)
-
-    def __len__(self):
-        return sum(
-            len(x.type)
-            for x in fields(self.dataclass)
-            if isinstance(x.type, _HWType)
-        )
+        return hwvalue(self.unsized.expr, value)
 
 
 def equivalent(t1, t2, sizes=True) -> bool:
     """Check if two types are equivalent"""
-    if type(t1) != type(t2):
-        return False
-    if isinstance(t1, _Int):
-        if sizes:
-            return t1 is t2
-        else:
-            return t1.signed == t2.signed
-    if isinstance(t1, _Struct):
-        fl1 = [x for x in fields(t1.dataclass) if isinstance(x.type, _HWType)]
-        fl2 = [x for x in fields(t2.dataclass) if isinstance(x.type, _HWType)]
-        if len(fl1) != len(fl2):
-            return False
-        for f1, f2 in zip(fl1, fl2):
-            if f1.name != f2.name:
-                return False
-            if not equivalent(f1.type, f2.type):
-                return False
-        return True
-    if isinstance(t1, _Array):
-        if t1.size != t2.size:
-            return False
-        if not equivalent(t1.type, t2.type):
-            return False
-        return True
-    if isinstance(t1, (_Clock, _Reset)):
-        return t1 is t2
-    raise TypeError(f"Unsupported type {t1}")
+    if not isinstance(t1, _HWType) or not isinstance(t2, _HWType):
+        raise TypeError()
+    return equal(t1.expr, t2.expr, sizes)
 
 
-class _Direction:
-    """Port direction"""
+clock = hwtype("clock", 1)
+reset = hwtype("reset", 1)
+async_reset = hwtype("async_reset", 1)
+sync_reset = hwtype("sync_reset", 1)
 
-    def __init__(self, name):
-        self.name = name
-
-
-INPUT = _Direction("input")
-OUTPUT = _Direction("output")
-
-
-clock = _Clock()
-reset = _Reset()
-async_reset = _AsyncReset()
-sync_reset = _SyncReset()
-
-uint = _IntFactory(_UInt)
-sint = _IntFactory(_SInt)
+uint = _IntFactory("uint")
+sint = _IntFactory("sint")
 u1 = uint[1]

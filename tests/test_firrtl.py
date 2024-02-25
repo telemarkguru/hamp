@@ -1,10 +1,9 @@
 from hamp._firrtl import generate
-from hamp._builder import build
-from hamp._module import module, input, output, wire, register, modules
+from hamp._module import module, input, output, wire, register
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
 from hamp._memory import memory, wmask_type
-from hamp._db import validate
+from hamp._db import validate, create
 from os.path import dirname, abspath
 import os
 from pprint import pprint
@@ -14,9 +13,7 @@ _this = dirname(abspath(__file__))
 
 
 def _generate_and_check(name, *m):
-    db = {}
-    for x in m:
-        build(x, db)
+    db = m[0].db
     with open(f"{_this}/{name}.db", "w") as fh:
         pprint(db, stream=fh, sort_dicts=False, indent=4)
     validate(db)
@@ -32,9 +29,7 @@ def _generate_and_check(name, *m):
 
 
 def test_simple():
-    modules.clear()
-
-    m = module("test")
+    m = module("test", db=create())
     m.x = input(u1)
     m.en = input(u1)
     m.y = output(uint[4])
@@ -52,10 +47,9 @@ def test_simple():
 
 
 def test_counter():
-    modules.clear()
     w = 10
 
-    m = module("test")
+    m = module("test", db=create())
     m.clk = input(clock)
     m.rst = input(async_reset)
     m.en = input(u1)
@@ -72,15 +66,13 @@ def test_counter():
     @m.code
     def main(x):  # pragma: no cover
         if x.en:
-            x.inc(x, add2(1))
+            inc(x, add2(1))
         x.out = x.cnt
 
     _generate_and_check("counter", m)
 
 
 def test_struct():
-    modules.clear()
-
     @struct
     class Data:
         x: uint[12]
@@ -93,7 +85,7 @@ def test_struct():
         data: Data
         data2: Data[3]
 
-    m = module("struct")
+    m = module("struct", db=create())
     m.clk = input(clock)
     m.din = input(Foo)
     m.dout = output(Foo)
@@ -114,9 +106,7 @@ def test_struct():
 
 
 def test_ops():
-    modules.clear()
-
-    m = module("ops")
+    m = module("ops", db=create())
     m.a = input(uint[8])
     m.b = input(uint[8])
     m.c = input(sint[8])
@@ -138,10 +128,8 @@ def test_ops():
 
 
 def test_index():
-    modules.clear()
-
-    m = module("index")
-    m.a = input(sint[8][3][4])
+    m = module("index", db=create())
+    m.a = input(sint[8][4][3])
     m.x = input(uint[2])
     m.y = input(uint[2])
     m.z = output(uint[18])
@@ -155,14 +143,14 @@ def test_index():
 
 
 def test_instantiation():
-    modules.clear()
+    db = create()
 
     @struct
     class Data:
         x: uint[2]
         y: sint[3]
 
-    m = module("mux")
+    m = module("mux", db=db)
     m.a = input(Data)
     m.b = input(Data)
     m.x = output(Data)
@@ -177,7 +165,7 @@ def test_instantiation():
 
     mux = m
 
-    m = module("mux4")
+    m = module("mux4", db=db)
     m.a = input(Data[4])
     m.x = output(Data)
     m.sel = input(uint[2])
@@ -203,9 +191,7 @@ def test_instantiation():
 
 
 def test_logic_expr():
-    modules.clear()
-
-    m = module("logexp")
+    m = module("logexp", db=create())
     m.a = input(uint[3])
     m.b = input(sint[4])
     m.c = input(uint[1])
@@ -227,8 +213,6 @@ def test_logic_expr():
 
 
 def test_composit_data_types():
-    modules.clear()
-
     @struct
     class C:
         r: sint[32]
@@ -239,7 +223,7 @@ def test_composit_data_types():
         x: C
         y: C
         z: C[4]
-        g: C[2][4]
+        g: C[4][2]
 
     @struct
     class R:
@@ -247,7 +231,7 @@ def test_composit_data_types():
         b: Pos
         c: uint[2]
 
-    m = module("data_types")
+    m = module("data_types", db=create())
     m.a = input(C)
     m.c = input(Pos)
     m.c2 = input(Pos[2])
@@ -282,14 +266,12 @@ def test_functional():
 
 
 def test_composit_register():
-    modules.clear()
-
     @struct
     class C:
         r: sint[20]
         i: sint[20]
 
-    m = module("composit_register")
+    m = module("composit_register", db=create())
     m.clk = input(clock)
     m.rst = input(async_reset)
     m.data = register(C)  # , value=dict(r=0, i=0))
@@ -309,7 +291,7 @@ def test_composit_register():
 
 
 def test_memory():
-    modules.clear()
+    db = create()
 
     @struct
     class D:
@@ -319,7 +301,7 @@ def test_memory():
 
     mask_t = wmask_type(D)
 
-    m = module("memories")
+    m = module("memories", db=db)
     m.clk = input(clock)
     m.addr = input(uint[8])
     m.we = input(u1)
@@ -328,7 +310,7 @@ def test_memory():
     m.wmode = input(u1)
     m.din = input(D[2])
     m.dout = output(D[2])
-    m.ram = memory(D, 256, ["r1"], ["w1"], ["rw1"])
+    m.ram = memory(D, 256, ["r1"], ["w1"], ["rw1"], db=db)
 
     m.wmask = wire(mask_t)
 
@@ -360,4 +342,4 @@ def test_memory():
         rw1.wmask = m.wmask
         m.dout[1] = rw1.rdata
 
-    _generate_and_check("memories", m.ram.type, m)
+    _generate_and_check("memories", m)

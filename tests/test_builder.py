@@ -1,16 +1,14 @@
-from hamp._builder import _CodeBuilder, build
 from hamp._module import (
     module,
     input,
     output,
     wire,
-    modules,
     attribute,
     register,
 )
 from hamp._hwtypes import uint, sint, clock, reset
 from hamp._struct import struct, flip
-from hamp._db import validate
+from hamp._db import validate, create
 from textwrap import dedent
 from pytest import raises
 from pprint import pprint
@@ -35,12 +33,12 @@ class C:
 
 
 def _module():
-    modules.clear()
-    mi = module("mod::inst")
+    db = create()
+    mi = module("mod::inst", db=db)
     mi.w = wire(sint[2])
     mi.i = input(uint[2], z=2)
     mi.p = input(C)
-    m = module("mod")
+    m = module("mod", db=db)
     m.x = output(uint[20], z=1)
     m.bigx = output(uint[1033])
     m.xx = output(uint[11])
@@ -48,7 +46,7 @@ def _module():
     m.y = input(uint[10])
     m.z = wire(uint[10])
     m.s = wire(uint[10][20], a=1)
-    m.s2 = wire(uint[10][2][20])
+    m.s2 = wire(uint[10][20][2])
     m.b = wire(B)
     m.ba = wire(C[3])
     m.p = input(C)
@@ -62,19 +60,16 @@ def _module():
 
 def _setup():
     m, _ = _module()
-    b = _CodeBuilder(m)
+    b = m.bld
     return b
 
 
 def test_module_builder():
     m, mi = _module()
-    db = {}
-    build(mi, db)
-    build(m, db)
 
     with open("m.json", "w") as fh:
-        pprint(db, stream=fh)
-    validate(db)
+        pprint(m.db, stream=fh)
+    validate(m.db)
 
 
 def test_code_builder():
@@ -146,9 +141,9 @@ def test_op2():
 
     def chk(op, v0=y, v1=z, rsize=None, x=x):
         if isinstance(v0, int):
-            v0 = (("uint", -1), v0)
+            v0 = (("uint", v0.bit_length()), v0)
         if isinstance(v1, int):
-            v1 = (("uint", -1), v1)
+            v1 = (("uint", v1.bit_length()), v1)
         rsize = rsize or 11
         assert b.code[-1] == (
             "connect",
@@ -289,11 +284,11 @@ def test_expressions():
     b.x = ((b.y + 1) // b.z + (1 + v)) % 32
     e1 = (("uint", 21), ("+", x, y))
     e8 = (("uint", 10), ("[]", s, e1))
-    e2 = (("uint", 11), ("+", (("uint", -1), 1), e8))
-    e4 = (("uint", 11), ("+", y, (("uint", -1), 1)))
+    e2 = (("uint", 11), ("+", (("uint", 1), 1), e8))
+    e4 = (("uint", 11), ("+", y, (("uint", 1), 1)))
     e5 = (("uint", 11), ("//", e4, z))
     e6 = (("uint", 12), ("+", e5, e2))
-    e3 = (("uint", 6), ("%", e6, (("uint", -1), 32)))
+    e3 = (("uint", 6), ("%", e6, (("uint", 6), 32)))
     assert b.code[-1] == ("connect", x, e3)
 
 
@@ -336,7 +331,7 @@ def test_bit_slicing():
     assert b.code[-1] == (
         "connect",
         xx,
-        (("uint", 2), ("bits", x, (("uint", -1), 3), (("uint", -1), 2))),
+        (("uint", 2), ("bits", x, (("uint", 0), 3), (("uint", 0), 2))),
     )
 
     with raises(TypeError, match="s is not a bit-vector"):
@@ -378,7 +373,7 @@ def test_array_indexing():
     assert b.code[-1] == (
         "connect",
         xx,
-        (("uint", 10), ("[]", s, (("uint", -1), 1))),
+        (("uint", 10), ("[]", s, (("uint", 1), 1))),
     )
 
     b.xx = b.s2[1][8]
@@ -387,7 +382,7 @@ def test_array_indexing():
         xx,
         (
             ("uint", 10),
-            ("[]", (s[0], ("[]", s2, (("uint", -1), 1))), (("uint", -1), 8)),
+            ("[]", (s[0], ("[]", s2, (("uint", 1), 1))), (("uint", 4), 8)),
         ),
     )
 
@@ -404,10 +399,10 @@ def test_array_indexing():
 
     b.s2[1] = b.s2[0]
 
-    assert b.s2[1]._full_name() == "s2[]"
-    assert b.s2[1][2]._full_name() == "s2[][]"
+    assert str(b.s2[1]) == "s2[0x1]"
+    assert str(b.s2[1][2]) == "s2[0x1][0x2]"
 
-    assert repr(b.s2.type) == "uint[10][2][20]"
+    assert repr(b.s2) == "uint[10][20][2]"
 
 
 def test_struct_member_access():
@@ -418,16 +413,16 @@ def test_struct_member_access():
     b.b.c.a = b.b.d.b
     b.b.c.a = 1
 
-    assert b.y._full_name() == "y"
-    assert b.b._full_name() == "b"
-    assert b.b.c.a._full_name() == "b.c.a"
-    assert b.ba[2].f[1].a._full_name() == "ba[].f[].a"
+    assert str(b.y) == "y"
+    assert str(b.b) == "b"
+    assert str(b.b.c.a) == "b.c.a"
+    assert str(b.ba[2].f[1].a) == "ba[0x2].f[0x1].a"
 
     with raises(AttributeError, match=r"has no member bix"):
         b.b.c.bix
 
     b.p.f[1].b = 1
-    with raises(TypeError, match=r"Not allowed to assign to p.f\[\].a"):
+    with raises(TypeError, match=r"Not allowed to assign to p.f\[0x1\].a"):
         b.p.f[1].a = 1
     with raises(TypeError, match=r"Not allowed to assign to p.f\[\]"):
         b.p.f[1] = 1
@@ -442,11 +437,13 @@ def test_instance_port_access():
     b = _setup()
 
     b.inst.i = 3
-    assert b.inst._full_name() == "inst"
-    assert b.inst.i._full_name() == "inst.i"
+    assert str(b.inst) == "inst"
+    assert str(b.inst.i) == "inst.i"
 
     b.inst.p.f[1].a = 1
-    with raises(TypeError, match=r"Not allowed to assign to inst.p.f\[\].b"):
+    with raises(
+        TypeError, match=r"Not allowed to assign to inst.p.f\[0x1\].b"
+    ):
         b.inst.p.f[1].b = 1
 
 
@@ -479,12 +476,12 @@ def test_assign_type_checking():
     with raises(TypeError, match="Cannot assign non-equivalent type"):
         b.inst.i = b.b.c
     with raises(
-        TypeError, match="Cannot assign non-input of instance inst: w"
+        TypeError, match="Cannot assign non-input of instance of mod::inst"
     ):
         b.inst.w = b.b.c
     with raises(TypeError, match="Cannot assign to instance inst"):
         b.inst = 1
-    with raises(TypeError, match="Cannot assign value of unsupported type"):
+    with raises(TypeError, match="Cannot assign to attribute att1"):
         b.att1 = 3
     with raises(TypeError, match="Cannot assign to input"):
         b.y = 3

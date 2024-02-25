@@ -2,63 +2,43 @@
 
 from contextlib import contextmanager
 from enum import Enum
-from typing import Union, Tuple, List, Any, Type, Sequence
-from ._module import (
-    _Module,
-    _ModuleMember,
-    _DataMember,
-    _ModuleCode,
-    _ModuleFunc,
-    _Instance,
-    _Port,
-    _Wire,
-    _Register,
-    _Attribute,
-)
-
+from typing import Union, Tuple, Any, Type
+from ._db import MODULE, DB
 from ._hwtypes import (
-    _Struct,
-    _Int,
-    _SInt,
-    _Array,
-    u1,
-    uint,
-    sint,
-    _IntValue,
-    equivalent,
-    INPUT,
-    OUTPUT,
+    equal,
+    _HWType,
 )
+from ._show import show_type, show_expr
 from ._struct import member, flipped
-from ._convert import convert
+
+# from ._convert import convert
 
 
-OpType = Union["_Expr", int]
+OpType = Union["_IntExpr", int]
 
 
 class _Expr:
-    """Ingeger Expression"""
+    """Expression"""
 
-    type: _Int
+    type: _HWType
+    expr: tuple
 
-    def __init__(self, type: _Int):
-        self.type = type
-
-    @property
-    def size(self) -> int:
-        return self.type.size
+    def __init__(self, expr: tuple):
+        self.type = _HWType(expr[0])
+        self.expr = expr
 
     def __len__(self):
-        return self.type.size
-
-    def new_type(self, size) -> _Int:
-        if isinstance(self.type, _SInt):
-            return sint[size]
-        else:
-            return uint[size]
+        return len(self.type)
 
     def expr(self):  # pragma: no cover
         assert False
+
+
+class _IntExpr(_Expr):
+    """Integer Expression"""
+
+    def new_type(self, size) -> _HWType:
+        return (self.expr[0][0], size)
 
     def _chk_slice(self, slice):
         error = None
@@ -68,11 +48,11 @@ class _Expr:
             error = "Step in slice index not allowed"
         elif slice.stop > slice.start:
             error = "Slice MSB must be equal to or larger than LSB"
-        elif slice.stop >= self.size:
+        elif slice.stop >= len(self):
             error = "Slice MSB must be less or equal to MSB"
         if error:
             slicestr = str(slice)[6:-1].replace(", ", ":")
-            raise IndexError(f"{error}: {self._id}[{slicestr}]")
+            raise IndexError(f"{error}: {show_expr(self.expr)}[{slicestr}]")
 
     def __getitem__(self, idx) -> "_Expr":
         if isinstance(idx, int):
@@ -169,343 +149,309 @@ class _Expr:
         return _NeExpr(self, value)
 
 
-class _ConstExpr(_Expr):
-    value: _IntValue
-
-    def __init__(self, value, signed, size=None):
-        type = sint if signed else uint
-        if size:
-            type = type[size]
-        else:
-            type = type.unsized
-        super().__init__(type)
-        self.value = type(value)
+class _ConstExpr(_IntExpr):
+    def __init__(self, value: int, signed: bool, size: int = 0):
+        kind = "sint" if signed else "uint"
+        if size == 0:
+            size = value.bit_length()
+        super().__init__(((kind, size), value))
 
     @property
-    def size(self):
-        if (s := self.value.type.size) == -1:
-            return self.value.value.bit_length()
-        return s
-
-    def expr(self):
-        t = self.value.type
-        return (t.expr(), self.value.value)
+    def value(self):
+        return self.expr[1]
 
 
-def _infer_int(type, value) -> _Expr:
-    if not isinstance(type, _Int):
-        raise TypeError(f"Cannot infer integer for type {type}")
-    return _ConstExpr(value, type.signed, type.size)
+def _infer_int(type: tuple, value: int) -> _ConstExpr:
+    k = type[0]
+    if k not in ("uint", "sint"):
+        raise TypeError(f"Cannot infer integer for type {k}")
+    return _ConstExpr(value, k == "sint", type[1])
 
 
-class _BitsExpr(_Expr):
-    op = "bits"
-    v1: _Expr
-    start: int
-    stop: int
-    size: int
+class _BitsExpr(_IntExpr):
+    """bits, a.k.a. [msb:lsb]"""
 
-    def __init__(self, v1: _Expr, start: int, stop: int, size: int):
-        self.type = uint[size]
-        self.start = start
-        self.stop = stop
-        self.v1 = v1
-
-    def expr(self):
-        start = (("uint", -1), self.start)
-        stop = (("uint", -1), self.stop)
-        return (
-            self.type.expr(),
-            (self.op, self.v1.expr(), start, stop),
+    def __init__(self, v1: _IntExpr, start: int, stop: int, size: int):
+        super().__init__(
+            (
+                ("uint", size),
+                ("bits", v1.expr, (("uint", 0), start), (("uint", 0), stop)),
+            )
         )
 
 
-class _TwoOpExpr(_Expr):
+class _TwoOpExpr(_IntExpr):
     op: str
-    v1: _Expr
-    v2: _Expr
+    v1: _IntExpr
+    v2: _IntExpr
 
     def __init__(self, v1: OpType, v2: OpType, v2signed=None):
-        assert isinstance(v1, (int, _Expr))
-        assert isinstance(v2, (int, _Expr))
-        if isinstance(v1, _Expr):
+        assert isinstance(v1, (int, _IntExpr))
+        assert isinstance(v2, (int, _IntExpr))
+        if isinstance(v1, _IntExpr):
             s1 = v1.type.signed
-            self.v1 = v1
-        if isinstance(v2, _Expr):
+        if isinstance(v2, _IntExpr):
             s2 = v2.type.signed
-            self.v2 = v2
         if isinstance(v1, int):
-            self.v1 = _ConstExpr(v1, s2)
+            v1 = _ConstExpr(v1, s2)
         elif isinstance(v2, int):
             if v2signed is not None:
                 s1 = v2signed
-            self.v2 = _ConstExpr(v2, s1)
-        self.check_types()
-        super().__init__(self.infer_type())
+            v2 = _ConstExpr(v2, s1)
+        self.check_types(v1, v2)
+        super().__init__(
+            (self.infer_type(v1, v2), (self.op, v1.expr, v2.expr))
+        )
 
-    def expr(self):
-        return (self.type.expr(), (self.op, self.v1.expr(), self.v2.expr()))
-
-    def check_types(self):
-        if self.v1.type.signed != self.v2.type.signed:
+    def check_types(self, v1, v2):
+        if v1.type.signed != v2.type.signed:
             raise TypeError(
                 "Both operands must have same sign "
-                f"{self.op}: {self.v1.type} {self.v2.type}"
+                f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self):  # pragma: no cover
+    def infer_type(self, v1, v2):  # pragma: no cover
         assert False
 
 
 class _CatExpr(_TwoOpExpr):
     op = "cat"
 
-    def infer_type(self) -> _Int:
-        size = self.v1.size + self.v2.size
-        return uint[size]
+    def infer_type(self, v1, v2) -> _HWType:
+        size = len(v1) + len(v2)
+        return ("uint", size)
 
 
 class _AddExpr(_TwoOpExpr):
     op = "+"
 
-    def infer_type(self) -> _Int:
-        size = max(self.v1.size, self.v2.size) + 1
-        return self.v1.new_type(size)
+    def infer_type(self, v1, v2) -> _HWType:
+        size = max(len(v1), len(v2)) + 1
+        return v1.new_type(size)
 
 
 class _SubExpr(_TwoOpExpr):
     op = "-"
 
-    def infer_type(self) -> _Int:
-        size = max(self.v1.size, self.v2.size) + 1
-        return self.v1.new_type(size)
+    def infer_type(self, v1, v2) -> _HWType:
+        size = max(len(v1), len(v2)) + 1
+        return v1.new_type(size)
 
 
 class _MulExpr(_TwoOpExpr):
     op = "*"
 
-    def infer_type(self) -> _Int:
-        size = self.v1.size + self.v2.size
-        return self.v1.new_type(size)
+    def infer_type(self, v1, v2) -> _HWType:
+        size = len(v1) + len(v2)
+        return v1.new_type(size)
 
 
 class _ModExpr(_TwoOpExpr):
     op = "%"
 
-    def infer_type(self) -> _Int:
-        size = min(self.v1.size, self.v2.size)
-        return self.v1.new_type(size)
+    def infer_type(self, v1, v2) -> _HWType:
+        size = min(len(v1), len(v2))
+        return v1.new_type(size)
 
 
 class _DivExpr(_TwoOpExpr):
     op = "//"
 
-    def infer_type(self) -> _Int:
-        size = self.v1.size + self.v1.type.signed
-        return self.v1.new_type(size)
+    def infer_type(self, v1, v2) -> _HWType:
+        size = len(v1) + v1.type.signed
+        return v1.new_type(size)
 
 
 class _OrExpr(_TwoOpExpr):
     op = "|"
 
-    def infer_type(self) -> _Int:
-        size = max(self.v1.size, self.v2.size)
-        return uint[size]
+    def infer_type(self, v1, v2) -> _HWType:
+        size = max(len(v1), len(v2))
+        return ("uint", size)
 
 
 class _AndExpr(_TwoOpExpr):
     op = "&"
 
-    def infer_type(self) -> _Int:
-        size = max(self.v1.size, self.v2.size)
-        return uint[size]
+    def infer_type(self, v1, v2) -> _HWType:
+        size = max(len(v1), len(v2))
+        return ("uint", size)
 
 
 class _XorExpr(_TwoOpExpr):
     op = "^"
 
-    def infer_type(self) -> _Int:
-        size = max(self.v1.size, self.v2.size)
-        return uint[size]
+    def infer_type(self, v1, v2) -> _HWType:
+        size = max(len(v1), len(v2))
+        return ("uint", size)
 
 
 class _LShiftExpr(_TwoOpExpr):
     op = "<<"
 
-    def check_types(self):
-        if self.v2.type.signed:
+    def check_types(self, v1, v2):
+        if v2.type.signed:
             raise TypeError(
                 "Shift amount must be an unsigned value"
-                f"{self.op}: {self.v1.type} {self.v2.type}"
+                f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self) -> _Int:
-        if isinstance(self.v2, _ConstExpr):
-            size = self.v1.size + self.v2.value.value
+    def infer_type(self, v1, v2) -> _HWType:
+        if isinstance(v2, _ConstExpr):
+            size = len(v1) + v2.value
         else:
-            size = self.v1.size + 2**self.v1.size - 1
-        return self.v1.new_type(size)
+            size = len(v1) + 2 ** len(v1) - 1
+        return v1.new_type(size)
 
 
 class _RShiftExpr(_TwoOpExpr):
     op = ">>"
 
-    def check_types(self):
-        if self.v2.type.signed:
+    def check_types(self, v1, v2):
+        if v2.type.signed:
             raise TypeError(
                 "Shift amount must be an unsigned value"
-                f"{self.op}: {self.v1.type} {self.v2.type}"
+                f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self) -> _Int:
-        if isinstance(self.v2, _ConstExpr):
-            size = max(self.v1.size - self.v2.value.value, 1)
+    def infer_type(self, v1, v2) -> _HWType:
+        if isinstance(v2, _ConstExpr):
+            size = max(len(v1) - v2.value, 1)
         else:
-            size = self.v1.size
-        return self.v1.new_type(size)
+            size = len(v1)
+        return v1.new_type(size)
 
 
-class _EqExpr(_TwoOpExpr):
+class _CmpExpr(_TwoOpExpr):
+    def infer_type(self, v1, v2) -> _HWType:
+        return ("uint", 1)
+
+
+class _EqExpr(_CmpExpr):
     op = "=="
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-class _GeExpr(_TwoOpExpr):
+class _GeExpr(_CmpExpr):
     op = ">="
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-class _GtExpr(_TwoOpExpr):
+class _GtExpr(_CmpExpr):
     op = ">"
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-class _LeExpr(_TwoOpExpr):
+class _LeExpr(_CmpExpr):
     op = "<="
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-class _LtExpr(_TwoOpExpr):
+class _LtExpr(_CmpExpr):
     op = "<"
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-class _NeExpr(_TwoOpExpr):
+class _NeExpr(_CmpExpr):
     op = "!="
 
-    def infer_type(self) -> _Int:
-        return u1
 
-
-def _reduce2(cls: Type[_TwoOpExpr], *ops: OpType) -> _Expr:
+def _reduce2(cls: Type[_TwoOpExpr], *ops: OpType) -> _IntExpr:
     assert len(ops) >= 2
     if len(ops) == 2:
         return cls(ops[0], ops[1])
     return cls(ops[0], _reduce2(cls, *ops[1:]))
 
 
-class _OneOpExpr(_Expr):
+class _OneOpExpr(_IntExpr):
     op: str
 
     def __init__(self, v1: OpType):
         assert isinstance(v1, _Expr)
-        self.v1 = v1
-        t = self.infer_type()
-        super().__init__(t)
+        t = self.infer_type(v1)
+        super().__init__((t, (self.op, v1.expr)))
 
-    def infer_type(self) -> _Int:  # pragma: no cover
+    def infer_type(self, v1) -> _HWType:  # pragma: no cover
         assert False
-
-    def expr(self):
-        return (self.type.expr(), (self.op, self.v1.expr()))
 
 
 class _CvtExpr(_OneOpExpr):
     op = "cvt"
 
-    def infer_type(self) -> _Int:
-        if self.v1.type.signed:
-            return self.v1.type
-        return sint[self.v1.size + 1]
+    def infer_type(self, v1) -> _HWType:
+        if v1.type.signed:
+            return v1.expr[0]
+        return ("sint", len(v1) + 1)
 
 
 class _NegExpr(_OneOpExpr):
     op = "neg"
 
-    def infer_type(self) -> _Int:
-        return sint[self.v1.size + 1]
+    def infer_type(self, v1) -> _HWType:
+        return ("sint", len(v1) + 1)
 
 
 class _NotExpr(_OneOpExpr):
     op = "not"
 
-    def infer_type(self) -> _Int:
-        return uint[self.v1.size]
+    def infer_type(self, v1) -> _HWType:
+        return ("uint", len(v1))
 
 
 class _OrrExpr(_OneOpExpr):
     op = "orr"
 
-    def infer_type(self) -> _Int:
-        return u1
-
-
-class _Var:
-    _id: Union[str, _Expr]
-    _builder: "_CodeBuilder"
-    _base: Union["_Var", None]
-
-    def __init__(
-        self,
-        id: Union[str, _Expr],
-        builder: "_CodeBuilder",
-        base: Union["_Var", None] = None,
-    ):
-        self._id = id
-        self._builder = builder
-        self._base = base
-
-    def _full_name(self, name: str = "") -> str:
-        if self._base:
-            if isinstance(self._id, str):
-                return self._base._full_name(self._id)
-            return self._base._full_name("")
-        assert isinstance(self._id, str)
-        return self._id
-
-
-class _IntVarExpr(_Expr, _Var):
-    def __init__(
-        self,
-        type: _Int,
-        id: Union[str, _Expr],
-        builder: "_CodeBuilder",
-        base: Union[_Var, None] = None,
-    ):
-        _Expr.__init__(self, type)
-        _Var.__init__(self, id, builder, base)
-
-    def expr(self, _=""):
-        if self._base:
-            return self._base.expr(self._id)
-        assert isinstance(self._id, str)
-        return (self.type.expr(), self._id)
+    def infer_type(self, _) -> _HWType:
+        return ("uint", 1)
 
 
 class Access(Enum):
     ANY = 0
     WR = 1
     RD = 2
+
+
+def _vartype(item: tuple, access: Access, builder: "_CodeBuilder") -> "_Var":
+    kind = item[0][0]
+    if kind == "struct":
+        return _StructVar(item, access, builder)
+    elif kind == "array":
+        return _ArrayVar(item, access, builder)
+    elif kind == "instance":
+        return _InstanceVar(item, access, builder)
+    return _IntVarExpr(item, builder)
+
+
+class _Var:
+    expr: tuple
+    _builder: "_CodeBuilder"
+    _type: _HWType
+    _access: Access
+
+    def __init__(
+        self,
+        expr: tuple,
+        access: Access,
+        builder: "_CodeBuilder",
+    ):
+        self.expr = expr
+        self._builder = builder
+        self._type = _HWType(expr[0])
+        self._access = access
+
+    def __len__(self):
+        return len(self._type)
+
+    def __str__(self) -> str:
+        return show_expr(self.expr)
+
+    def __repr__(self) -> str:
+        return show_type(self.expr[0])
+
+
+class _IntVarExpr(_IntExpr, _Var):
+    def __init__(
+        self,
+        expr: tuple,
+        builder: "_CodeBuilder",
+    ):
+        _IntExpr.__init__(self, expr)
+        _Var.__init__(self, expr, Access.RD, builder)
 
 
 def _flip_access(a, flip):
@@ -518,222 +464,141 @@ def _flip_access(a, flip):
 
 
 class _StructVar(_Var):
-    _VARS = set(("_id", "type", "_builder", "_base", "_access"))
-    type: _Struct
-
-    def __init__(
-        self,
-        type: _Struct,
-        id: Union[str, _Expr],
-        access: Access,
-        builder: "_CodeBuilder",
-        base: Union[_Var, None] = None,
-    ):
-        super().__init__(id, builder, base)
-        self.type = type
-        self._access = access
+    _VARS = set(("expr", "_builder", "_type", "_access"))
+    _access: Access
 
     def __getattr__(self, name: str) -> _Var:
-        item = member(self.type, name)
-        access = _flip_access(self._access, flipped(self.type, name))
-        return _vartype(item, name, self._builder, self, access)
+        item = member(self._type, name)
+        access = _flip_access(self._access, flipped(self._type, name))
+        return _vartype(
+            (item.expr, (".", self.expr, name)), access, self._builder
+        )
 
-    def __setattr__(self, name: str, value: Union[_Expr, int]):
+    def __setattr__(self, name: str, value: Union[_Expr, _Var, int]):
         if name in _StructVar._VARS:
             super().__setattr__(name, value)
             return
-        access = _flip_access(self._access, flipped(self.type, name))
+        access = _flip_access(self._access, flipped(self._type, name))
         if access == Access.RD:
-            raise TypeError(
-                f"Not allowed to assign to {self._full_name(name)}"
-            )
-        item = member(self.type, name)
+            raise TypeError(f"Not allowed to assign to {str(self)}.{name}")
+        item = member(self._type, name)
         if isinstance(value, int):
-            value = _infer_int(item, value)
-        if not equivalent(value.type, item, False):
+            value = _infer_int(item.expr, value)
+        if not equal(value.expr[0], item.expr, False):
             raise TypeError(
-                f"Cannot assign non-equivalent type {value.type} to {type}"
+                "Cannot assign non-equivalent type "
+                f"{show_type(value.expr[0])} to {show_type(item.expr)}"
             )
-        self._builder.code.append(("connect", self.expr(name), value.expr()))
-
-    def expr(self, id=""):
-        if not id:
-            if self._base:
-                return self._base.expr(self._id)
-            return (self.type.expr(), self._id)
-        item = member(self.type, id).expr()
-        if self._base:
-            return (item, (".", self._base.expr(self._id), id))
-        return (item, (".", (self.type.expr(), self._id), id))
-
-    def _full_name(self, name: str = "") -> str:
-        if name:
-            name = f".{name}"
-        else:
-            name = ""
-        if isinstance(self._id, str):
-            name = f"{self._id}{name}"
-        if self._base:
-            return self._base._full_name(name)
-        return name
-
-    def __len__(self):
-        return len(self.type)
+        self._builder.code.append(
+            ("connect", (item.expr, (".", self.expr, name)), value.expr)
+        )
 
 
 class _ArrayVar(_Var):
-    type: _Array
-
-    def __init__(
-        self,
-        type: _Array,
-        id: Union[str, _Expr],
-        access: Access,
-        builder: "_CodeBuilder",
-        base: Union[_Var, None] = None,
-    ):
-        super().__init__(id, builder, base)
-        self.type = type
-        self.access = access
-
     def _chk_idx(self, idx: int) -> _ConstExpr:
-        size = self.type.size
+        size = self._type.size
         if not 0 <= idx < size:
             raise IndexError(
-                f"{self._id}[{idx}] is out of range (size={size})"
+                f"{str(self)}[{idx}] is out of range (size={size})"
             )
         return _ConstExpr(idx, False)
 
     def __getitem__(self, idx: OpType) -> _Var:
         if isinstance(idx, slice):
-            raise TypeError(f"{self._id} is not a bit-vector")
+            # TODO: Add vector slice support
+            raise TypeError(f"{str(self)} is not a bit-vector")
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
-        return _vartype(self.type.type, idx, self._builder, self, self.access)
+        return _vartype(
+            (self._type.type.expr, ("[]", self.expr, idx.expr)),
+            self._access,
+            self._builder,
+        )
 
     def __setitem__(self, idx: OpType, value: OpType) -> None:
-        type = self.type.type
+        type = self._type.type
         if isinstance(idx, int):
             idx = self._chk_idx(idx)
-        if self.access == Access.RD:
-            raise TypeError(f"Not allowed to assign to {self._full_name('')}")
+        if self._access == Access.RD:
+            raise TypeError(f"Not allowed to assign to {str(self)}[]")
         if isinstance(value, int):
             value = _ConstExpr(value, type.signed)
-        if not equivalent(type, value.type, False):
+        if not equal(type.expr, value.expr[0], False):
             raise TypeError(
-                f"Cannot assign non-equivalent type {value.type} to {type}"
+                "Cannot assign non-equivalent type "
+                f"{show_type(value.expr[0])} to {show_type(type.expr)}"
             )
-        self._builder.code.append(("connect", self.expr(idx), value.expr()))
-
-    def expr(self, idx=None):
-        if self._base:
-            t, b = self._base.expr(self._id)
-        else:
-            t = self.type.expr()
-            b = self._id
-        if idx is not None:
-            i = idx.expr()
-            rt = self.type.type.expr()
-            return (rt, ("[]", (t, b), i))
-        else:
-            return (t, b)
-
-    def _full_name(self, name=None) -> str:
-        if name is not None:
-            name = f"[]{name}"
-        else:
-            name = ""
-        if isinstance(self._id, str):
-            name = f"{self._id}{name}"
-        if self._base:
-            return self._base._full_name(name)
-        return name
-
-    def __len__(self):
-        return len(self.type)
+        self._builder.code.append(
+            (
+                "connect",
+                (self._type.type.expr, ("[]", self.expr, idx.expr)),
+                value.expr,
+            )
+        )
 
 
 class _InstanceVar(_Var):
-    _VARS = set(("_id", "type", "_builder", "_base"))
-    type: _Module
+    _VARS = set(("expr", "_builder", "_type", "_access", "_module"))
+    _module = None
 
-    def __init__(
-        self,
-        type: _Module,
-        id: str,
-        builder: "_CodeBuilder",
-        base: Union[_Var, None] = None,
-    ):
-        super().__init__(id, builder, base)
-        self.type = type
+    def _get_module(self):
+        db = self._builder.db
+        cn, mn = self.expr[0][1:3]
+        m = db["circuits"][cn][mn]
+        self._module = m
+        return m
+
+    def _lookup(self, name: str) -> tuple:
+        if (m := self._module) is None:
+            m = self._get_module()
+        if (item := m["data"].get(name)) is None:
+            cn, mn = self.expr[0][1:3]
+            raise AttributeError(f"Module {cn}::{mn} has no member {name}")
+        return item
 
     def __getattr__(self, name: str) -> _Var:
-        if name not in self.type:
-            raise AttributeError(
-                f"Module {self.type.name} has no member {name}"
+        item = self._lookup(name)
+        kind = item[0]
+        if kind == "input":
+            return _vartype(
+                (item[1], (".", self.expr, name)), Access.WR, self._builder
             )
-        item = self.type[name]
-        if isinstance(item, _Port):
-            access = Access.WR if item.direction == INPUT else Access.RD
-            return _vartype(item.type, name, self._builder, self, access)
-        raise TypeError(
-            f"Cannot access {name} in instance of {self.type.name}"
-        )
+        if kind == "output":
+            return _vartype(
+                (item[1], (".", self.expr, name)), Access.RD, self._builder
+            )
+        cn, mn = self.expr[0][1:3]
+        raise TypeError(f"Cannot access {name} in instance of {cn}::{mn}")
 
     def __setattr__(self, name: str, value: Union[_Expr, int]):
         if name in _InstanceVar._VARS:
             super().__setattr__(name, value)
             return
-        if name not in self.type:
-            raise AttributeError(
-                f"Module {self.type.name} has no member {name}"
+        item = self._lookup(name)
+        kind = item[0]
+        if kind == "input":
+            if isinstance(value, int):
+                value = _infer_int(item[1], value)
+            if not equal(item[1], value.expr[0], False):
+                raise TypeError(
+                    "Cannot assign non-equivalent type "
+                    f"{show_type(value.expr[0])} to {show_type(item[1])}"
+                )
+            self._builder.code.append(
+                ("connect", (item[1], (".", self.expr, name)), value.expr)
             )
-        item = self.type[name]
-        if not isinstance(item, _Port) or item.direction != INPUT:
-            raise TypeError(
-                f"Cannot assign non-input of instance {self._id}: {name}"
-            )
-        if isinstance(value, int):
-            value = _infer_int(item.type, value)
-        if not equivalent(item.type, value.type, False):
-            raise TypeError(
-                f"Cannot assign non-equivalent type {value.type} to {item.type}"
-            )
-        self._builder.code.append(("connect", self.expr(name), value.expr()))
-
-    def expr(self, name):
-        item = self.type[name]
-        return (item.type.expr(), (".", "instance", self._id, name))
-
-    def _full_name(self, name: str = "") -> str:
-        assert isinstance(self._id, str)
-        if name:
-            name = f"{self._id}.{name}"
-        else:
-            name = self._id
-        return name
-
-
-def _vartype(type, name, builder, base, access=Access.ANY) -> _Var:
-    if isinstance(type, _Struct):
-        return _StructVar(type, name, access, builder, base)
-    elif isinstance(type, _Array):
-        return _ArrayVar(type, name, access, builder, base)
-    elif isinstance(type, _Module):
-        return _InstanceVar(type, name, builder, base)
-    return _IntVarExpr(type, name, builder, base)
+            return
+        cn, mn = self.expr[0][1:3]
+        raise TypeError(f"Cannot assign non-input of instance of {cn}::{mn}")
 
 
 def _logic_value(value: OpType) -> OpType:
     if isinstance(value, _Expr):
         type = value.type
-        if (
-            isinstance(type, _Int)
-            and type.size != 1
-            or isinstance(type, _SInt)
-        ):
-            return _OrrExpr(value)
-        return value
+        kind = type.kind
+        if kind == "uint" and len(type) == 1:
+            return value
+        return _OrrExpr(value)
     return _ConstExpr(int(bool(value)), False, 1)
 
 
@@ -743,54 +608,46 @@ CodeListItemType = Tuple[Any, ...]
 class _CodeBuilder:
     """Represents a module when generating code"""
 
-    _VARS = set(("module", "code", "cat", "cvt"))
+    _VARS = set(("name", "module", "_data", "db", "code", "cat", "cvt"))
 
-    def __init__(self, module: _Module):
+    def __init__(self, name: str, module: MODULE, db: DB):
+        self.name = name
         self.module = module
-        self.code: List[CodeListItemType] = []
+        self._data = module["data"]
+        self.db = db
+        self.code = module["code"]
 
-    def __getattr__(self, name: str) -> Union[_Var, _ModuleMember, bool]:
-        if name not in self.module:
-            raise AttributeError(
-                f"Module {self.module.name} has no member {name}"
-            )
-        item = self.module[name]
-        if isinstance(item, _ModuleFunc):
-            return self.module[name]
-        if isinstance(item, _DataMember):
-            access = Access.ANY
-            if isinstance(item, _Port):
-                access = Access.RD if item.direction == INPUT else Access.WR
-            return _vartype(item.type, name, self, None, access)
-        return False  # pragma: no cover
+    def __getattr__(self, name: str) -> _Var:
+        if not (item := self._data.get(name)):
+            raise AttributeError(f"Module {self.name} has no member {name}")
+        kind = item[0]
+        access = Access.ANY
+        if kind == "input":
+            access = Access.RD
+        elif kind == "output":
+            access = Access.WR
+        return _vartype((item[1], name), access, self)
 
     def __setattr__(self, name: str, value) -> None:
         """Assign value"""
         if name in _CodeBuilder._VARS:
             super().__setattr__(name, value)
             return
-        if name not in self.module:
-            raise AttributeError(
-                f"Module {self.module.name} has no member {name}"
-            )
-        item = self.module[name]
-        if not isinstance(item, _DataMember):
-            raise TypeError(
-                f"Cannot assign value of unsupported type: {value}"
-            )
-        if isinstance(item, _Port):
-            if item.direction != OUTPUT:
-                raise TypeError(f"Cannot assign to input {name}")
-        elif isinstance(item, _Instance):
-            raise TypeError(f"Cannot assign to instance {name}")
-        if isinstance(value, int):
-            value = _infer_int(item.type, value)
-        if not equivalent(item.type, value.type, False):
-            raise TypeError(
-                f"Cannot assign non-equivalent type {value.type} to {item.type}"
-            )
-        assert isinstance(item, (_Port, _Wire, _Register))
-        self.code.append(("connect", (item.type.expr(), name), value.expr()))
+        if name not in self._data:
+            raise AttributeError(f"Module {self.name} has no member {name}")
+        item = self._data[name]
+        kind = item[0]
+        if kind in ("output", "wire", "register"):
+            if isinstance(value, int):
+                value = _infer_int(item[1], value)
+            if not equal(item[1], value.expr[0], sizes=False):
+                raise TypeError(
+                    "Cannot assign non-equivalent type "
+                    f"{show_type(value.expr[0])} to {show_type(item[1])}"
+                )
+            self.code.append(("connect", (item[1], name), value.expr))
+        else:
+            raise TypeError(f"Cannot assign to {kind} {name}")
 
     def __str__(self) -> str:
         text = []
@@ -823,7 +680,7 @@ class _CodeBuilder:
         try:
             yield None
         finally:
-            code.append(("when", _logic_value(expr).expr(), tuple(self.code)))
+            code.append(("when", _logic_value(expr).expr, tuple(self.code)))
             self.code = code
 
     @contextmanager
@@ -835,7 +692,7 @@ class _CodeBuilder:
             yield None
         finally:
             code.append(
-                ("else-when", _logic_value(expr).expr(), tuple(self.code))
+                ("else-when", _logic_value(expr).expr, tuple(self.code))
             )
             self.code = code
 
@@ -868,84 +725,3 @@ class _CodeBuilder:
     def cvt(self, op):
         """Convert to signed"""
         return _CvtExpr(op)
-
-
-def _ports(module: _Module) -> Sequence[tuple]:
-    ports = []
-    for p in module._iter_types(_Port):
-        assert isinstance(p, _Port)
-        direction = "input" if p.direction == INPUT else "output"
-        ports.append((p.name, direction, p.type.expr(), p.attributes))
-    return ports
-
-
-def _wires(module: _Module) -> Sequence[tuple]:
-    wires = []
-    for w in module._iter_types(_Wire):
-        assert isinstance(w, _Wire)
-        wires.append((w.name, w.type.expr(), w.attributes))
-    return wires
-
-
-def _registers(module: _Module) -> Sequence[tuple]:
-    reset: Union[int, tuple]
-    regs = []
-    for r in module._iter_types(_Register):
-        assert isinstance(r, _Register)
-        clk = r.clock.name
-        if r.value is None:
-            reset = 0
-        else:
-            reset = (r.reset.name, r.value)
-        regs.append((r.name, r.type.expr(), clk, reset, r.attributes))
-    return regs
-
-
-def _instances(module: _Module) -> Sequence[tuple]:
-    instances = []
-    for i in module._iter_types(_Instance):
-        assert isinstance(i, _Instance)
-        cname, mname = i.type.name.split("::")
-        instances.append((i.name, cname, mname, i.attributes))
-    return instances
-
-
-def _code(module: _Module) -> Sequence[tuple]:
-    b = _CodeBuilder(module)
-    for cf in module._iter_types(_ModuleFunc):
-        if not cf.converted:
-            f, txt = convert(cf.function, module)
-            cf.function = f
-            cf.converted = True
-    for cc in module._iter_types(_ModuleCode):
-        if not cc.converted:
-            f, txt = convert(cc.function, module)
-            cc.function = f
-            cc.converted = True
-        else:
-            f = cc.function
-        f(b)
-    return b.code
-
-
-def _attributes(module: _Module) -> dict:
-    return {a.name: a.value for a in module._iter_types(_Attribute)}
-
-
-def build(module: _Module, db: dict[str, dict]) -> None:
-    """Generate intermediate format for module and add to database"""
-    m = dict(
-        ports=_ports(module),
-        wires=_wires(module),
-        registers=_registers(module),
-        instances=_instances(module),
-        code=_code(module),
-        attributes=_attributes(module),
-    )
-    cname, mname = module.name.split("::")
-    if "circuits" not in db:
-        db["circuits"] = {}
-    c = db["circuits"]
-    if cname not in c:
-        c[cname] = {}
-    c[cname][mname] = m

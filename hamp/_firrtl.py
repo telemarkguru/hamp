@@ -74,8 +74,6 @@ def _expr(x: tuple, k=False) -> str:
                 return str(v)
             else:
                 return f"{_type(t)}({v})"
-        case (".", "instance", str(iname), str(pname)):
-            return f"{iname}.{pname}"
         case (str(op), *args):
             if op in ("<<", ">>") and isinstance(args[1][1], int):
                 opstr, _, _ = _op_to_func[f"{op}k"]
@@ -107,8 +105,6 @@ def _type(t: tuple) -> str:
             return "Clock"
         case ("async_reset", 1):
             return "AsyncReset"
-        case ("sync_reset", 1):
-            return "SyncReset"
         case ("reset", 1):
             return "AsyncReset"
         case _:  # pragma no cover
@@ -168,21 +164,30 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
     """Generate FIRRTL code for module"""
     lines += ["", f"  module {mname} :"]
     m = db["circuits"][cname][mname]
-    for p in m["ports"]:
-        lines.append(f"    {p[1]} {p[0]} : {_type(p[2])}")
+    data = m["data"]
+    for pdir in ("input", "output"):
+        for pname in m[pdir]:
+            p = data[pname]
+            lines.append(f"    {pdir} {pname} : {_type(p[1])}")
     lines.append("")
-    for w in m["wires"]:
-        lines.append(f"    wire {w[0]} : {_type(w[1])}")
-    for r in m["registers"]:
+    for wname in m["wire"]:
+        w = data[wname]
+        lines.append(f"    wire {wname} : {_type(w[1])}")
+    for rname in m["register"]:
+        r = data[rname]
         lines.append(
-            f"    reg {r[0]} : {_type(r[1])}, {r[2]}{_reset(r[3], r[1])}"
+            f"    reg {rname} : {_type(r[1])}, {r[2]}{_reset(r[3], r[1])}"
         )
-    for i in m["instances"]:
-        if i[1] == "mem":
-            attr = db["circuits"][i[1]][i[2]]["attributes"]
-            _memory(i[0], attr, lines)
+    for iname in m["instance"]:
+        i = data[iname]
+        cn, mn = i[1][1:3]
+        if cn == "mem":
+            mm = db["circuits"][cn][mn]
+            data = mm["data"]
+            attr = {k: data[k][1] for k in mm["attribute"]}
+            _memory(iname, attr, lines)
             continue
-        lines.append(f"    inst {i[0]} of {i[2]}")
+        lines.append(f"    inst {iname} of {mn}")
     lines.append("")
     _statements(m["code"], lines)
     lines.append("")

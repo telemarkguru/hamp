@@ -1,22 +1,23 @@
 from hamp._memory import memory, wmask_type
 from hamp._hwtypes import uint, sint
 from hamp._struct import struct
-from hamp._builder import build
+from hamp._db import create
 
 
 def test_base_type_memory():
-    mem = memory(uint[8], 32, readers=["r"], writers=["w"], readwriters=["rw"])
-    db = {}
-    mem.type.name = "mem::mem"
-    build(mem.type, db)
+    db = create()
+    memory(
+        uint[8], 32, readers=["r"], writers=["w"], readwriters=["rw"], db=db
+    )
 
     assert db == {
         "circuits": {
             "mem": {
                 "mem": {
-                    "ports": [
-                        (
-                            "r",
+                    "input": ["r", "w", "rw"],
+                    "output": [],
+                    "data": {
+                        "r": (
                             "input",
                             (
                                 "struct",
@@ -27,8 +28,7 @@ def test_base_type_memory():
                             ),
                             {},
                         ),
-                        (
-                            "w",
+                        "w": (
                             "input",
                             (
                                 "struct",
@@ -40,8 +40,7 @@ def test_base_type_memory():
                             ),
                             {},
                         ),
-                        (
-                            "rw",
+                        "rw": (
                             "input",
                             (
                                 "struct",
@@ -55,19 +54,25 @@ def test_base_type_memory():
                             ),
                             {},
                         ),
-                    ],
-                    "wires": [],
-                    "registers": [],
-                    "instances": [],
-                    "code": [],
-                    "attributes": {
-                        "_ismem": 1,
-                        "_depth": 32,
-                        "_type": ("uint", 8),
-                        "_readers": ["r"],
-                        "_writers": ["w"],
-                        "_readwriters": ["rw"],
+                        "_ismem": ("attribute", 1),
+                        "_depth": ("attribute", 32),
+                        "_type": ("attribute", ("uint", 8)),
+                        "_readers": ("attribute", ["r"]),
+                        "_writers": ("attribute", ["w"]),
+                        "_readwriters": ("attribute", ["rw"]),
                     },
+                    "wire": [],
+                    "register": [],
+                    "instance": [],
+                    "code": [],
+                    "attribute": [
+                        "_ismem",
+                        "_type",
+                        "_depth",
+                        "_readers",
+                        "_writers",
+                        "_readwriters",
+                    ],
                 }
             }
         }
@@ -79,11 +84,11 @@ def test_wmask_type():
     class S:
         a: uint[10]
         b: uint[10][20]
-        c: sint[10][3][5]
+        c: sint[10][5][3]
 
     SA = S[3]
 
-    assert wmask_type(SA).expr() == (
+    assert wmask_type(SA).expr == (
         "array",
         3,
         (

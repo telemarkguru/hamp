@@ -12,8 +12,8 @@ circuit ops :
 
 
     x[UInt(0)] <= dshr(a, b)
-    x[UInt(1)] <= bits(dshl(a, b), 8, 0)
+    x[UInt<1>(1)] <= bits(dshl(a, b), 8, 0)
     y[UInt(0)] <= dshr(c, b)
-    y[UInt(1)] <= dshl(c, b)
+    y[UInt<1>(1)] <= dshl(c, b)
     z[UInt(0)] <= shl(c, 3)
-    z[UInt(1)] <= shr(c, 2)
+    z[UInt<1>(1)] <= shr(c, 2)

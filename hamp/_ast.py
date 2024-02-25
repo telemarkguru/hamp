@@ -15,6 +15,9 @@ def _dedent(s):
 def parse_func(func):
     """Parse function source and return AST"""
     source = _dedent(inspect.getsource(func))
+    empty_lines = [
+        i for i, line in enumerate(source.splitlines()) if not line.strip()
+    ]
     tree = compile(
         source,
         mode="exec",
@@ -22,4 +25,4 @@ def parse_func(func):
         dont_inherit=True,
         flags=ast.PyCF_ONLY_AST,
     )
-    return tree
+    return tree, empty_lines

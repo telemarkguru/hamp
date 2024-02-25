@@ -25,20 +25,26 @@ MODULES:
 
 MODULE:
     {
-        "ports": [*PORT]
-        "wires": [*WIRE]
-        "registers": [*REGISTER]
-        "instances": [*INSTANCE],
+        "input": [*NAME],
+        "output": [*NAME],
+        "wire": [*NAME],
+        "register": [*NAME],
+        "instance": [*NAME],
+        "attribute": [*NAME],
+        "data": {
+            NAME: DATAITEM,
+            ...
+        },
         "code": [*CODE],
-        "attributes": ATTRIBUTES,
     }
 
-PORT:
-    (NAME, DIRECTION, TYPE, *ATTRIBUTES)
-
-DIRECTION:
-    "input"
-    "output"
+DATAITEM:
+    ("input", TYPE, ATTRIBUTES?)
+    ("output", TYPE, ATTRIBUTES?)
+    ("wire", TYPE, ATTRIBUTES?)
+    ("register", TYPE, CLOCK, RESET, ATTRIBUTES?)
+    ("instance", ("instance", NAME, NAME), ATTRIBUTES?)
+    ("attribute", ATTRVAL)
 
 TYPE:
     ("uint", WIDTH)
@@ -47,9 +53,10 @@ TYPE:
     ("struct", (NAME, TYPE, FLIP), *(NAME, TYPE, FLIP))
     ("clock", 1)
     ("reset", 1)
+    ("instance", NAME, NAME)  # circuit-name module-name
 
 WIDTH:
-    integer, -1 or >= 1
+    integer, >= 0
 
 SIZE:
     integer >= 1
@@ -57,18 +64,17 @@ SIZE:
 FLIP:
     0 or 1
 
-WIRE:
-    (NAME, TYPE, *ATTRIBUTES)
-
-REGISTER:
-    (NAME, TYPE, CLOCK, RESET, *ATTRIBUTES)
-
 CLOCK:
-    VAR or type ("clock", 1)
+    NAME  # Must be name of variable of type ("clock", 1)
 
 RESET:
-    0
-    (VAR, VALUE)  # VAR is of type ("reset", 1), VALUE of reg TYPE
+    0             # Means no reset
+    (NAME, VALUE) # Must be name of variable of type:
+                  # ("reset, 1), ("async_reset", 1) or ("uint", 1)
+                  # VALUE must be of same type as register
+
+EXPR:
+    (TYPE, VALUE)
 
 VALUE:
     integer
@@ -79,22 +85,18 @@ VALUE:
 
 VAR:
     NAME
-    (".", (("struct" ...), VAR) NAME)
-    ("[]", (("array", ...), VAR) VALUE)  # Value must be of type ("uint", *)
-    (".", "instance", NAME, NAME)  # instance-name, port-name
+    (".", (("struct" ...), VAR), NAME)
+    ("[]", (("array", ...), VAR), VALUE)  # Value must be of type ("uint", *)
+    (".", (("instance", ...), NAME), NAME)  # inst-name, port-name
 
 OP:
     "+", "-", ...
 
-INSTANCE:
-    (NAME, NAME, NAME, *ATTRIBUTES)
-    # instance-name, circuit-name, module-name
-
 CODE:
-    ("connect", (TYPE, VAR), (TYPE, VALUE))
-    ("when", (("uint", 1), VALUE), (*CODE), *ATTRIBUTES)
-    ("else-when", (("uint", 1), VALUE), (*CODE), *ATTRIBUTES)
-    ("else", (*CODE), *ATTRIBUTES)
+    ("connect", (TYPE, VAR), (TYPE, VALUE), ATTRIBUTES?)
+    ("when", (("uint", 1), VALUE), (*CODE), ATTRIBUTES?)
+    ("else-when", (("uint", 1), VALUE), (*CODE), ATTRIBUTES?)
+    ("else", (*CODE), ATTRIBUTES?)
 
 ATTRIBUTES:
     {}

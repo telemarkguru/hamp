@@ -1,12 +1,12 @@
 from hamp._convert import convert
-from hamp._module import module, input, wire, modules
+from hamp._module import module, input, wire
 from hamp._hwtypes import clock, reset, uint
+from hamp._db import create
 from textwrap import dedent
 
 
 def test_closure():
-    modules.clear()
-    m = module("closure")
+    m = module("closure", db=create())
 
     a = 3
 
@@ -17,7 +17,7 @@ def test_closure():
         z = xyz(x + 3) + xyz(4)
         return z
 
-    f, txt = convert(fx, m)
+    f, txt = convert(fx, m.module)
 
     assert f(1) == 14
     assert (
@@ -33,9 +33,8 @@ def test_closure():
 
 
 def test_if():
-    modules.clear()
-    m = module("test")
-    m.a = input(clock())
+    m = module("test", db=create())
+    m.a = input(clock)
     m.b = wire(uint[2])
     p = 2
 
@@ -48,7 +47,7 @@ def test_if():
             else:
                 z = 5  # noqa: F841
 
-    f, txt = convert(foo, m)
+    f, txt = convert(foo, m.module)
     assert (
         txt
         == dedent(
@@ -67,8 +66,7 @@ def test_if():
 
 
 def test_and_or_not():
-    modules.clear()
-    m = module("test")
+    m = module("test", db=create())
     m.a = input(clock)
     m.b = input(uint[2])
     m.c = input(reset)
@@ -81,7 +79,7 @@ def test_and_or_not():
         if not x.c:
             z += ~3
 
-    f, txt = convert(foo, m)
+    f, txt = convert(foo, m.module)
     assert (
         txt
         == dedent(

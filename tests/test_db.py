@@ -1,6 +1,6 @@
 """Test data-base validation"""
 
-from hamp._db import validate
+from hamp._db import validate, create, create_module
 from pytest import raises
 
 
@@ -19,52 +19,63 @@ t2 = (
 
 
 def _create_db():
-    return {
-        "circuits": {
-            "foo": {
-                "foo": {},
-                "bar": {
-                    "ports": [
-                        ("pi", "input", ("uint", 2)),
-                        ("po", "output", ("sint", 10)),
-                        ("clk", "input", ("clock", 1)),
-                    ],
-                    "wires": [
-                        ("a", ("uint", 2)),
-                        ("x", ("uint", 1)),
-                        ("z", ("uint", 1)),
-                        ("p", ("uint", 1)),
-                        ("t", ("uint", 1)),
-                    ],
-                },
-                "baz": {
-                    "ports": [],
-                    "wires": [("a", ("uint", 3))],
-                    "registers": [],
-                    "code": [],
-                },
-                "ok": {
-                    "ports": [
-                        ("p1", "input", ("uint", 2)),
-                        ("p2", "output", ("sint", 10)),
-                        ("p3", "output", t2),
-                        ("p4", "input", ("array", 4, t2)),
-                        ("p5", "input", ("sint", 9)),
-                        ("p6", "input", ("sint", 9)),
-                        ("p7", "input", ("array", 2, ("sint", 8))),
-                        ("p8", "input", ("uint", 1)),
-                    ],
-                    "wires": [],
-                    "registers": [],
-                    "instances": [
-                        ("i0", "foo", "bar"),
-                        ("i1", "foo", "baz"),
-                    ],
-                    "code": [],
+    db = create()
+    db.update(
+        {
+            "circuits": {
+                "foo": {
+                    "foo": {"data": {}},
+                    "bar": {
+                        "input": ["pi", "clk", "rst1", "rst2"],
+                        "output": ["po"],
+                        "wire": ["a", "x", "z", "p", "t"],
+                        "register": [],
+                        "instance": [],
+                        "attribute": ["attr1", "attr2"],
+                        "data": {
+                            "pi": ("input", ("uint", 2)),
+                            "po": ("output", ("sint", 10), {}),
+                            "clk": ("input", ("clock", 1)),
+                            "rst1": ("input", ("reset", 1)),
+                            "rst2": ("input", ("async_reset", 1)),
+                            "a": ("wire", ("uint", 2)),
+                            "x": ("wire", ("uint", 1)),
+                            "z": ("wire", ("uint", 1)),
+                            "p": ("wire", ("uint", 1)),
+                            "t": ("wire", ("uint", 1)),
+                            "attr1": ("attribute", 1),
+                            "attr2": ("attribute", {"a": 2, "c": [1, 3]}),
+                        },
+                    },
+                    "ok": {
+                        "input": ["p1", "p4", "p5", "p6", "p7", "p8"],
+                        "output": ["p2", "p3"],
+                        "wire": [],
+                        "register": [],
+                        "instance": ["i0", "i1"],
+                        "attribute": [],
+                        "data": {
+                            "p1": ("input", ("uint", 2), {"a": 1}),
+                            "p2": ("output", ("sint", 10)),
+                            "p3": ("output", t2),
+                            "p4": ("input", ("array", 4, t2)),
+                            "p5": ("input", ("sint", 9)),
+                            "p6": ("input", ("sint", 9)),
+                            "p7": ("input", ("array", 2, ("sint", 8))),
+                            "p8": ("input", ("uint", 1)),
+                            "i0": ("instance", ("instance", "foo", "bar")),
+                            "i1": ("instance", ("instance", "foo", "baz")),
+                        },
+                        "code": [],
+                    },
                 },
             },
-        },
-    }
+        }
+    )
+    baz = create_module(db, "foo", "baz")
+    baz["wire"] = ["a"]
+    baz["data"]["a"] = ("wire", ("uint", 2))
+    return db
 
 
 def test_validate_circuits():
@@ -96,25 +107,32 @@ def test_validate_module():
 def test_validate_ports():
     db = _create_db()
     bar = db["circuits"]["foo"]["bar"]
-    bar["ports"] = [
-        ("p1", "input", ("uint", 1)),
-        ("p2", "output", ("sint", 3)),
-    ]
+    bar["input"].append("p1")
+    bar["output"].append("p2")
+    bar["data"].update(
+        {
+            "p1": ("input", ("uint", 1)),
+            "p2": ("output", ("sint", 3)),
+        }
+    )
     validate(db)
-    bar["ports"].append(("p3", "fooput", 1, 2))
-    with raises(ValueError, match="Malformed port entry in module bar"):
+    bar["data"]["p2"] = ("fooput", ("uint", 1))
+    with raises(ValueError, match="Malformed output entry in module bar"):
         validate(db)
 
 
 def test_validate_wires():
     db = _create_db()
     bar = db["circuits"]["foo"]["bar"]
-    bar["wires"] = [
-        ("p1", ("uint", 1), {"k": 3}),
-        ("p2", ("sint", 3)),
-    ]
+    bar["wire"] += ["p1", "p2"]
+    bar["data"].update(
+        {
+            "p1": ("wire", ("uint", 1), {"k": 3}),
+            "p2": ("wire", ("sint", 3)),
+        }
+    )
     validate(db)
-    bar["wires"].append(("p3",))
+    bar["data"]["p2"] = ("wopper", 3, 2)
     with raises(ValueError, match="Malformed wire entry in module bar"):
         validate(db)
 
@@ -122,18 +140,33 @@ def test_validate_wires():
 def test_validate_registers():
     db = _create_db()
     bar = db["circuits"]["foo"]["bar"]
-    bar["registers"] = [
-        ("r1", ("uint", 1), "clk", ("reset", 3)),
-        ("r2", ("sint", 3), "clk", 0, {"a1": [1, 2, 3]}),
-    ]
+    bar["register"] = ["r1", "r2"]
+    bar["data"].update(
+        {
+            "r1": ("register", ("uint", 1), "clk", ("rst1", 3)),
+            "r2": ("register", ("sint", 3), "clk", 0, {"a1": [1, 2, 3]}),
+        }
+    )
     validate(db)
-    bar["registers"].append(("r3", 1, 2))
+    bar["data"]["r2"] = ("register", 1, 2)
     with raises(ValueError, match="Malformed register entry in module bar"):
         validate(db)
     with raises(ValueError, match="Malformed attribute value"):
-        bar["registers"] = [
-            ("r2", ("sint", 3), "clk", 0, {"a1": None}),
-        ]
+        bar["data"]["r1"] = ("register", ("sint", 3), "clk", 0, {"a1": None})
+        validate(db)
+    with raises(ValueError, match=r"Surplus attribute data: \[2\]"):
+        bar["data"]["r1"] = ("register", ("sint", 3), "clk", 0, {"a1": 1}, 2)
+        validate(db)
+    with raises(ValueError, match=r"Reset signal q not defined in module bar"):
+        bar["data"]["r1"] = ("register", ("sint", 3), "clk", ("q", 1))
+        validate(db)
+    with raises(ValueError, match=r"Bad register reset type: \('uint', 2\)"):
+        bar["data"]["r1"] = ("register", ("sint", 3), "clk", ("a", 1))
+        validate(db)
+    with raises(
+        ValueError, match=r"Malformed value \[1, 2\] of type \('sint', 3\)"
+    ):
+        bar["data"]["r1"] = ("register", ("sint", 3), "clk", ("rst1", [1, 2]))
         validate(db)
 
 
@@ -148,7 +181,7 @@ def test_validate_code():
             (("connect", (("uint", 1), "z"), (("uint", 1), "p")),),
             {"anno": (4.1, "a")},
         ),
-        ("else-when", (("uint", 1), "t"), (), {"anno2": "a"}, {"anno3": 1}),
+        ("else-when", (("uint", 1), "t"), (), {"anno2": "a", "anno3": 1}),
         ("else", (), {"anno2": {"a": {"b": [{"c": 1}]}}}),
     ]
     validate(db)
@@ -173,7 +206,8 @@ def test_validate_var():
         ),
     ]
     validate(db)
-    ok["wires"].append(("z", ("uint", 4)))
+    ok["wire"].append("z")
+    ok["data"]["z"] = ("wire", ("uint", 4))
     with raises(ValueError, match="Malformed variable"):
         ok["code"] = [("connect", (("uint", 3), ("z", 2)), (("uint", 3), 1))]
         validate(db)
@@ -206,6 +240,7 @@ def test_validate_var():
                     (".", (("struct", ("b", ("sint", 1), 0)), "x"), "a"),
                 ),
                 (("sint", -3), 1),
+                {"b": 1},
             )
         ]
         validate(db)
@@ -265,6 +300,7 @@ def test_validate_expr():
                     ),
                 ),
             ),
+            {"hooop": [1, 2]},
         ),
     ]
     validate(db)
@@ -324,6 +360,15 @@ def test_validate_values():
             ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [3.2] * 7}})),
         ]
         validate(db)
+    ok["code"] = []
+    with raises(ValueError, match=r"Malformed data section in module"):
+        ok["data"]["ping"] = 3
+        validate(db)
+    del ok["data"]["ping"]
+    with raises(ValueError, match=r"Malformed attribute entry in module"):
+        ok["attribute"].append("ako")
+        ok["data"]["ako"] = ("flup", 3)
+        validate(db)
 
 
 def test_validate_instances():
@@ -332,13 +377,13 @@ def test_validate_instances():
     ok["code"] = [
         (
             "connect",
-            (("uint", 2), (".", "instance", "i0", "pi")),
+            (("uint", 2), (".", (("instance", "foo", "bar"), "i0"), "pi")),
             (("uint", 2), 0),
         ),
         (
             "connect",
             (("sint", 10), "p2"),
-            (("sint", 10), (".", "instance", "i0", "po")),
+            (("sint", 10), (".", (("instance", "foo", "bar"), "i0"), "po")),
         ),
     ]
     validate(db)
@@ -348,33 +393,53 @@ def test_validate_instances():
         ok["code"] = [
             (
                 "connect",
-                (("uint", 3), (".", "instance", "i0", "pi")),
+                (("uint", 3), (".", (("instance", "foo", "bar"), "i0"), "pi")),
                 (("uint", 2), 0),
             ),
         ]
         validate(db)
-    with raises(ValueError, match="Module foo::bar has no port nix"):
+    with raises(ValueError, match="Module foo::bar has no port nx"):
         ok["code"] = [
             (
                 "connect",
-                (("uint", 2), (".", "instance", "i0", "nix")),
+                (("uint", 2), (".", (("instance", "foo", "bar"), "i0"), "nx")),
                 (("uint", 2), 0),
             ),
         ]
         validate(db)
     with raises(ValueError, match="No module named foo::z found"):
-        ok["instances"] = [("z", "foo", "z")]
+        ok["instance"] = ["z"]
+        ok["data"]["z"] = ("instance", ("instance", "foo", "z"))
         validate(db)
     with raises(ValueError, match="Malformed instance entry in module ok"):
-        ok["instances"] = [("z", "foo")]
+        ok["data"]["z"] = [("inst", "z", "foo")]
         validate(db)
     with raises(ValueError, match="Module ok has no instance wefop"):
-        ok["instances"] = []
+        ok["instance"] = []
+        del ok["data"]["z"]
         ok["code"] = [
             (
                 "connect",
-                (("uint", 2), (".", "instance", "wefop", "pi")),
+                (("uint", 2), (".", (("instance", "a", "b"), "wefop"), "pi")),
                 (("uint", 2), 0),
             ),
         ]
         validate(db)
+    with raises(ValueError, match="Inconsistent module names"):
+        db = _create_db()
+        ok = db["circuits"]["foo"]["ok"]
+        ok["code"] = [
+            (
+                "connect",
+                (("uint", 2), (".", (("instance", "a", "b"), "i0"), "pi")),
+                (("uint", 2), 0),
+            ),
+        ]
+        validate(db)
+
+
+def test_redefine_module():
+    db = create()
+    create_module(db, "flipp", "flopp")
+    with raises(NameError, match="Module flipp::flopp already defined"):
+        create_module(db, "flipp", "flopp")

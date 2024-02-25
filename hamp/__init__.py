@@ -6,8 +6,6 @@ from ._hwtypes import (
     reset,
     async_reset,
     sync_reset,
-    INPUT,
-    OUTPUT,
 )
 from ._module import (
     module,
@@ -18,13 +16,11 @@ from ._module import (
     attribute,
     unique,
     instance,
-    modules,
 )
 from ._struct import (
     struct,
 )
 from ._firrtl import generate as generate_firrtl
-from ._builder import build
 
 __all__ = (
     "uint",
@@ -34,8 +30,6 @@ __all__ = (
     "reset",
     "async_reset",
     "sync_reset",
-    "INPUT",
-    "OUTPUT",
     "module",
     "input",
     "output",
@@ -46,6 +40,5 @@ __all__ = (
     "instance",
     "modules",
     "struct",
-    "build",
     "generate_firrtl",
 )

@@ -2,16 +2,17 @@
 Memory instance creation
 """
 
-from ._hwtypes import _HWType, uint, u1, clock, _Int, _Struct, _Array
-from ._module import _Instance, module, input, attribute, unique
+from ._hwtypes import _HWType, uint, u1, clock
+from ._module import _ModuleMemberSetter, module, input, attribute, unique
 from ._struct import struct, flip, members
+from ._db import DB
+from typing import Optional
 
 
 def wmask_type(type):
     """Create mask type"""
-    if isinstance(type, _Int):
-        return u1
-    if isinstance(type, _Struct):
+    kind = type.kind
+    if kind == "struct":
 
         class _MaskStruct:
             pass
@@ -19,9 +20,10 @@ def wmask_type(type):
         for name, type in members(type):
             _MaskStruct.__annotations__[name] = wmask_type(type)
         return struct(_MaskStruct)
-    if isinstance(type, _Array):
-        return _Array(wmask_type(type.type), type.size)
-    assert False, f"type={type}"  # pragma: no cover
+    elif kind == "array":
+        return wmask_type(type.type)[type.size]
+    else:
+        return u1
 
 
 # mypy: ignore-errors
@@ -36,7 +38,8 @@ def memory(
     read_latency: int = 1,
     write_latency: int = 1,
     write_mask: bool = True,
-) -> _Instance:
+    db: Optional[DB] = None,
+) -> _ModuleMemberSetter:
     """Create memory instance"""
 
     addr_bits = (depth - 1).bit_length()
@@ -44,9 +47,9 @@ def memory(
     clock_t = clock
     mtype = wmask_type(type)
 
-    m = module(unique("mem"))
+    m = module(unique("mem", db=db), db=db)
     m._ismem = attribute(1)
-    m._type = attribute(type.expr())
+    m._type = attribute(type.expr)
     m._depth = attribute(depth)
     m._readers = attribute(readers)
     m._writers = attribute(writers)
