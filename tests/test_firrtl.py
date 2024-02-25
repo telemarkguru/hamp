@@ -4,6 +4,7 @@ from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
 from hamp._memory import memory, wmask_type
 from hamp._db import validate, create
+from hamp._stdlib import cat
 from os.path import dirname, abspath
 import os
 from pprint import pprint
@@ -137,7 +138,7 @@ def test_index():
 
     @m.code
     def main(x):  # pragma: no cover
-        x.z = x.cat(x.a[x.x][x.y], x.b)
+        x.z = cat(x.a[x.x][x.y], x.b)
 
     _generate_and_check("index", m)
 

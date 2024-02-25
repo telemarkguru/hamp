@@ -9,6 +9,7 @@ from hamp._module import (
 from hamp._hwtypes import uint, sint, clock, reset
 from hamp._struct import struct, flip
 from hamp._db import validate, create
+from hamp._stdlib import cvt, cat
 from textwrap import dedent
 from pytest import raises
 from pprint import pprint
@@ -75,7 +76,7 @@ def test_module_builder():
 def test_code_builder():
     b = _setup()
     b.x = 3
-    assert b.code == [("connect", (("uint", 20), "x"), (("uint", 20), 3))]
+    assert b._code == [("connect", (("uint", 20), "x"), (("uint", 20), 3))]
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
@@ -85,7 +86,7 @@ def test_code_builder():
     with b.else_stmt():
         b.x = 0
 
-    assert b.code == [
+    assert b._code == [
         # fmt: off
         ("connect", (("uint", 20), "x"), (("uint", 20), 3)),
         ("connect",
@@ -145,7 +146,7 @@ def test_op2():
         if isinstance(v1, int):
             v1 = (("uint", v1.bit_length()), v1)
         rsize = rsize or 11
-        assert b.code[-1] == (
+        assert b._code[-1] == (
             "connect",
             x,
             (("uint", rsize), (op, v0, v1)),
@@ -239,32 +240,32 @@ def test_op2():
     chk("<=", rsize=1)
 
     b.x = +b.y
-    assert b.code[-1] == ("connect", x, y)
+    assert b._code[-1] == ("connect", x, y)
 
     b.xs = -b.y
-    assert b.code[-1] == ("connect", xs, (("sint", 11), ("neg", y)))
+    assert b._code[-1] == ("connect", xs, (("sint", 11), ("neg", y)))
 
     b.x = ~b.y
-    assert b.code[-1] == ("connect", x, (("uint", 10), ("not", y)))
+    assert b._code[-1] == ("connect", x, (("uint", 10), ("not", y)))
 
-    b.x = b.cat(b.y, b.z)
+    b.x = cat(b.y, b.z)
     chk("cat", rsize=20)
 
-    b.b.e = b.cvt(b.x)
+    b.b.e = cvt(b.x)
     bt = (
         "struct",
         ("c", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 0),
         ("d", ("struct", ("a", ("uint", 2), 0), ("b", ("uint", 2), 1)), 1),
         ("e", ("sint", 12), 0),
     )
-    assert b.code[-1] == (
+    assert b._code[-1] == (
         "connect",
         (("sint", 12), (".", (bt, "b"), "e")),
         (("sint", 21), ("cvt", x)),
     )
 
-    b.b.e = b.cvt(b.b.e)
-    assert b.code[-1] == (
+    b.b.e = cvt(b.b.e)
+    assert b._code[-1] == (
         "connect",
         (("sint", 12), (".", (bt, "b"), "e")),
         (("sint", 12), ("cvt", (("sint", 12), (".", (bt, "b"), "e")))),
@@ -289,7 +290,7 @@ def test_expressions():
     e5 = (("uint", 11), ("//", e4, z))
     e6 = (("uint", 12), ("+", e5, e2))
     e3 = (("uint", 6), ("%", e6, (("uint", 6), 32)))
-    assert b.code[-1] == ("connect", x, e3)
+    assert b._code[-1] == ("connect", x, e3)
 
 
 def test_logop():
@@ -304,16 +305,16 @@ def test_logop():
         return (("uint", 1), ("orr", p))
 
     b.x = b.and_expr(b.y, b.z)
-    assert b.code[-1] == ("connect", x, (("uint", 1), ("&", orr(y), orr(z))))
+    assert b._code[-1] == ("connect", x, (("uint", 1), ("&", orr(y), orr(z))))
 
     b.x = b.or_expr(b.y, b.z)
-    assert b.code[-1] == ("connect", x, (("uint", 1), ("|", orr(y), orr(z))))
+    assert b._code[-1] == ("connect", x, (("uint", 1), ("|", orr(y), orr(z))))
 
     b.x = b.not_expr(b.y)
-    assert b.code[-1] == ("connect", x, (("uint", 1), ("not", orr(y))))
+    assert b._code[-1] == ("connect", x, (("uint", 1), ("not", orr(y))))
 
     b.x = b.and_expr(b.y, 10)
-    assert b.code[-1] == (
+    assert b._code[-1] == (
         "connect",
         x,
         (("uint", 1), ("&", orr(y), (("uint", 1), 1))),
@@ -328,7 +329,7 @@ def test_bit_slicing():
     xx = (("uint", 11), "xx")
     x = (("uint", 20), "x")
 
-    assert b.code[-1] == (
+    assert b._code[-1] == (
         "connect",
         xx,
         (("uint", 2), ("bits", x, (("uint", 0), 3), (("uint", 0), 2))),
@@ -367,17 +368,17 @@ def test_array_indexing():
     y = (("uint", 10), "y")
 
     b.xx = b.s[b.x]
-    assert b.code[-1] == ("connect", xx, (("uint", 10), ("[]", s, x)))
+    assert b._code[-1] == ("connect", xx, (("uint", 10), ("[]", s, x)))
 
     b.xx = b.s[1]
-    assert b.code[-1] == (
+    assert b._code[-1] == (
         "connect",
         xx,
         (("uint", 10), ("[]", s, (("uint", 1), 1))),
     )
 
     b.xx = b.s2[1][8]
-    assert b.code[-1] == (
+    assert b._code[-1] == (
         "connect",
         xx,
         (
@@ -387,7 +388,7 @@ def test_array_indexing():
     )
 
     b.s[b.x] = b.y
-    assert b.code[-1] == ("connect", (("uint", 10), ("[]", s, x)), y)
+    assert b._code[-1] == ("connect", (("uint", 10), ("[]", s, x)), y)
 
     with raises(IndexError, match=r"s\[21\] is out of range \(size=20\)"):
         b.y = b.s[21]

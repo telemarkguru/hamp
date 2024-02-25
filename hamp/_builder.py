@@ -30,9 +30,6 @@ class _Expr:
     def __len__(self):
         return len(self.type)
 
-    def expr(self):  # pragma: no cover
-        assert False
-
 
 class _IntExpr(_Expr):
     """Integer Expression"""
@@ -214,14 +211,6 @@ class _TwoOpExpr(_IntExpr):
         assert False
 
 
-class _CatExpr(_TwoOpExpr):
-    op = "cat"
-
-    def infer_type(self, v1, v2) -> _HWType:
-        size = len(v1) + len(v2)
-        return ("uint", size)
-
-
 class _AddExpr(_TwoOpExpr):
     op = "+"
 
@@ -370,15 +359,6 @@ class _OneOpExpr(_IntExpr):
         assert False
 
 
-class _CvtExpr(_OneOpExpr):
-    op = "cvt"
-
-    def infer_type(self, v1) -> _HWType:
-        if v1.type.signed:
-            return v1.expr[0]
-        return ("sint", len(v1) + 1)
-
-
 class _NegExpr(_OneOpExpr):
     op = "neg"
 
@@ -489,7 +469,7 @@ class _StructVar(_Var):
                 "Cannot assign non-equivalent type "
                 f"{show_type(value.expr[0])} to {show_type(item.expr)}"
             )
-        self._builder.code.append(
+        self._builder._code.append(
             ("connect", (item.expr, (".", self.expr, name)), value.expr)
         )
 
@@ -528,7 +508,7 @@ class _ArrayVar(_Var):
                 "Cannot assign non-equivalent type "
                 f"{show_type(value.expr[0])} to {show_type(type.expr)}"
             )
-        self._builder.code.append(
+        self._builder._code.append(
             (
                 "connect",
                 (self._type.type.expr, ("[]", self.expr, idx.expr)),
@@ -542,7 +522,7 @@ class _InstanceVar(_Var):
     _module = None
 
     def _get_module(self):
-        db = self._builder.db
+        db = self._builder._db
         cn, mn = self.expr[0][1:3]
         m = db["circuits"][cn][mn]
         self._module = m
@@ -584,7 +564,7 @@ class _InstanceVar(_Var):
                     "Cannot assign non-equivalent type "
                     f"{show_type(value.expr[0])} to {show_type(item[1])}"
                 )
-            self._builder.code.append(
+            self._builder._code.append(
                 ("connect", (item[1], (".", self.expr, name)), value.expr)
             )
             return
@@ -608,18 +588,18 @@ CodeListItemType = Tuple[Any, ...]
 class _CodeBuilder:
     """Represents a module when generating code"""
 
-    _VARS = set(("name", "module", "_data", "db", "code", "cat", "cvt"))
+    _VARS = set(("_name", "_module", "_data", "_db", "_code"))
 
     def __init__(self, name: str, module: MODULE, db: DB):
-        self.name = name
-        self.module = module
+        self._name = name
+        self._module = module
         self._data = module["data"]
-        self.db = db
-        self.code = module["code"]
+        self._db = db
+        self._code = module["code"]
 
     def __getattr__(self, name: str) -> _Var:
         if not (item := self._data.get(name)):
-            raise AttributeError(f"Module {self.name} has no member {name}")
+            raise AttributeError(f"Module {self._name} has no member {name}")
         kind = item[0]
         access = Access.ANY
         if kind == "input":
@@ -634,7 +614,7 @@ class _CodeBuilder:
             super().__setattr__(name, value)
             return
         if name not in self._data:
-            raise AttributeError(f"Module {self.name} has no member {name}")
+            raise AttributeError(f"Module {self._name} has no member {name}")
         item = self._data[name]
         kind = item[0]
         if kind in ("output", "wire", "register"):
@@ -645,7 +625,7 @@ class _CodeBuilder:
                     "Cannot assign non-equivalent type "
                     f"{show_type(value.expr[0])} to {show_type(item[1])}"
                 )
-            self.code.append(("connect", (item[1], name), value.expr))
+            self._code.append(("connect", (item[1], name), value.expr))
         else:
             raise TypeError(f"Cannot assign to {kind} {name}")
 
@@ -670,42 +650,42 @@ class _CodeBuilder:
                     case _:
                         text.append(f"{indent}{c}")
 
-        f(self.code)
+        f(self._code)
         return "\n".join(text)
 
     @contextmanager
     def if_stmt(self, expr):
-        code = self.code
-        self.code = []
+        code = self._code
+        self._code = []
         try:
             yield None
         finally:
-            code.append(("when", _logic_value(expr).expr, tuple(self.code)))
-            self.code = code
+            code.append(("when", _logic_value(expr).expr, tuple(self._code)))
+            self._code = code
 
     @contextmanager
     def elif_stmt(self, expr):
-        assert self.code[-1][0] in ("when", "else-when")
-        code = self.code
-        self.code = []
+        assert self._code[-1][0] in ("when", "else-when")
+        code = self._code
+        self._code = []
         try:
             yield None
         finally:
             code.append(
-                ("else-when", _logic_value(expr).expr, tuple(self.code))
+                ("else-when", _logic_value(expr).expr, tuple(self._code))
             )
-            self.code = code
+            self._code = code
 
     @contextmanager
     def else_stmt(self):
-        assert self.code[-1][0] in ("when", "else-when")
-        code = self.code
-        self.code = []
+        assert self._code[-1][0] in ("when", "else-when")
+        code = self._code
+        self._code = []
         try:
             yield None
         finally:
-            code.append(("else", tuple(self.code)))
-            self.code = code
+            code.append(("else", tuple(self._code)))
+            self._code = code
 
     def and_expr(self, *ops):
         ops2 = [_logic_value(x) for x in ops]
@@ -717,11 +697,3 @@ class _CodeBuilder:
 
     def not_expr(self, op):
         return _NotExpr(_logic_value(op))
-
-    def cat(self, *ops):
-        """Concatenate bits"""
-        return _reduce2(_CatExpr, *ops)
-
-    def cvt(self, op):
-        """Convert to signed"""
-        return _CvtExpr(op)
