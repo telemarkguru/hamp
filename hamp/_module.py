@@ -53,12 +53,12 @@ class _ModuleMember:
             elif name == "reset":
                 rst = self.data[3]
                 if rst == 0:
-                    return None
+                    raise AttributeError(f"Register {self.name} has no reset")
                 return rst[0]
             elif name == "value":
                 rst = self.data[3]
                 if rst == 0:
-                    return None
+                    raise AttributeError(f"Register {self.name} has no reset")
                 return rst[1]
         raise TypeError(f"Cannot get attribute {name} of {self.kind}")
 
@@ -165,7 +165,7 @@ class _Module:
         """Add member to this module"""
         self.__setattr__(name, value)
 
-    def __getitem__(self, name: str) -> _ModuleMember:
+    def __getitem__(self, name: str) -> Union[_ModuleMember, "_Module"]:
         """Return member with the given name (m[name])"""
         return self.__getattr__(name)
 
@@ -216,7 +216,7 @@ class _Module:
         func(self.bld)
         return None
 
-    def function(self, function: Callable) -> None:
+    def function(self, function: Callable) -> Callable:
         """Decorator for adding hardware generating function, like so:
 
         @a_module.function

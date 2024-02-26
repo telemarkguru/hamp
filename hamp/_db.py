@@ -4,17 +4,28 @@ Stores module data
 """
 
 import re
-from typing import Union
+from typing import Union, TypedDict
 
-TL = Union[tuple, list]
+TL = tuple
 DB = dict[str, dict]
 VAL = Union[str, tuple, int]
 VAR = Union[str, tuple]
 VARS = dict[str, tuple]
 DATA = dict[str, TL]
-MODULE = dict[str, Union[list[str], DATA]]
 NL = list[str]
 ATTR = dict[str, Union[str, int, dict, list]]
+
+
+class MODULE(TypedDict):
+    input: list[str]
+    output: list[str]
+    wire: list[str]
+    register: list[str]
+    instance: list[str]
+    attribute: list[str]
+    data: dict[str, tuple]
+    code: list[tuple]
+
 
 default: DB = {"circuits": {}}
 
@@ -24,12 +35,13 @@ def create() -> DB:
     return {"circuits": {}}
 
 
-def create_module(db: DB, circuit: str, module: str) -> dict:
+def create_module(db: DB, circuit: str, module: str) -> MODULE:
     """Create empty module, add to DB and return it"""
     circ = db["circuits"].setdefault(circuit, {})
     if module in circ:
         raise NameError(f"Module {circuit}::{module} already defined")
-    m = circ[module] = {
+    m: MODULE
+    circ[module] = m = {
         "input": [],
         "output": [],
         "wire": [],

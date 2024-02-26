@@ -38,7 +38,6 @@ __all__ = (
     "attribute",
     "unique",
     "instance",
-    "modules",
     "struct",
     "generate_firrtl",
 )

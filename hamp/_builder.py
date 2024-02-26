@@ -11,8 +11,6 @@ from ._hwtypes import (
 from ._show import show_type, show_expr
 from ._struct import member, flipped
 
-# from ._convert import convert
-
 
 OpType = Union["_IntExpr", int]
 
@@ -34,7 +32,7 @@ class _Expr:
 class _IntExpr(_Expr):
     """Integer Expression"""
 
-    def new_type(self, size) -> _HWType:
+    def new_type(self, size) -> tuple:
         return (self.expr[0][0], size)
 
     def _chk_slice(self, slice):
@@ -179,22 +177,22 @@ class _BitsExpr(_IntExpr):
 
 class _TwoOpExpr(_IntExpr):
     op: str
-    v1: _IntExpr
-    v2: _IntExpr
 
     def __init__(self, v1: OpType, v2: OpType, v2signed=None):
         assert isinstance(v1, (int, _IntExpr))
         assert isinstance(v2, (int, _IntExpr))
         if isinstance(v1, _IntExpr):
             s1 = v1.type.signed
+            if isinstance(v2, int):
+                if v2signed is not None:
+                    s1 = v2signed
+                v2 = _ConstExpr(v2, s1)
         if isinstance(v2, _IntExpr):
             s2 = v2.type.signed
-        if isinstance(v1, int):
-            v1 = _ConstExpr(v1, s2)
-        elif isinstance(v2, int):
-            if v2signed is not None:
-                s1 = v2signed
-            v2 = _ConstExpr(v2, s1)
+            if isinstance(v1, int):
+                v1 = _ConstExpr(v1, s2)
+        assert isinstance(v1, _IntExpr)
+        assert isinstance(v2, _IntExpr)
         self.check_types(v1, v2)
         super().__init__(
             (self.infer_type(v1, v2), (self.op, v1.expr, v2.expr))
@@ -207,14 +205,14 @@ class _TwoOpExpr(_IntExpr):
                 f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self, v1, v2):  # pragma: no cover
+    def infer_type(self, v1, v2) -> tuple:  # pragma: no cover
         assert False
 
 
 class _AddExpr(_TwoOpExpr):
     op = "+"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = max(len(v1), len(v2)) + 1
         return v1.new_type(size)
 
@@ -222,7 +220,7 @@ class _AddExpr(_TwoOpExpr):
 class _SubExpr(_TwoOpExpr):
     op = "-"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = max(len(v1), len(v2)) + 1
         return v1.new_type(size)
 
@@ -230,7 +228,7 @@ class _SubExpr(_TwoOpExpr):
 class _MulExpr(_TwoOpExpr):
     op = "*"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = len(v1) + len(v2)
         return v1.new_type(size)
 
@@ -238,7 +236,7 @@ class _MulExpr(_TwoOpExpr):
 class _ModExpr(_TwoOpExpr):
     op = "%"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = min(len(v1), len(v2))
         return v1.new_type(size)
 
@@ -246,7 +244,7 @@ class _ModExpr(_TwoOpExpr):
 class _DivExpr(_TwoOpExpr):
     op = "//"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = len(v1) + v1.type.signed
         return v1.new_type(size)
 
@@ -254,7 +252,7 @@ class _DivExpr(_TwoOpExpr):
 class _OrExpr(_TwoOpExpr):
     op = "|"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = max(len(v1), len(v2))
         return ("uint", size)
 
@@ -262,7 +260,7 @@ class _OrExpr(_TwoOpExpr):
 class _AndExpr(_TwoOpExpr):
     op = "&"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = max(len(v1), len(v2))
         return ("uint", size)
 
@@ -270,7 +268,7 @@ class _AndExpr(_TwoOpExpr):
 class _XorExpr(_TwoOpExpr):
     op = "^"
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         size = max(len(v1), len(v2))
         return ("uint", size)
 
@@ -285,7 +283,7 @@ class _LShiftExpr(_TwoOpExpr):
                 f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         if isinstance(v2, _ConstExpr):
             size = len(v1) + v2.value
         else:
@@ -303,7 +301,7 @@ class _RShiftExpr(_TwoOpExpr):
                 f"{self.op}: {v1.type} {v2.type}"
             )
 
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         if isinstance(v2, _ConstExpr):
             size = max(len(v1) - v2.value, 1)
         else:
@@ -312,7 +310,7 @@ class _RShiftExpr(_TwoOpExpr):
 
 
 class _CmpExpr(_TwoOpExpr):
-    def infer_type(self, v1, v2) -> _HWType:
+    def infer_type(self, v1, v2) -> tuple:
         return ("uint", 1)
 
 
@@ -355,28 +353,28 @@ class _OneOpExpr(_IntExpr):
         t = self.infer_type(v1)
         super().__init__((t, (self.op, v1.expr)))
 
-    def infer_type(self, v1) -> _HWType:  # pragma: no cover
+    def infer_type(self, v1) -> tuple:  # pragma: no cover
         assert False
 
 
 class _NegExpr(_OneOpExpr):
     op = "neg"
 
-    def infer_type(self, v1) -> _HWType:
+    def infer_type(self, v1) -> tuple:
         return ("sint", len(v1) + 1)
 
 
 class _NotExpr(_OneOpExpr):
     op = "not"
 
-    def infer_type(self, v1) -> _HWType:
+    def infer_type(self, v1) -> tuple:
         return ("uint", len(v1))
 
 
 class _OrrExpr(_OneOpExpr):
     op = "orr"
 
-    def infer_type(self, _) -> _HWType:
+    def infer_type(self, v1) -> tuple:
         return ("uint", 1)
 
 
@@ -572,7 +570,7 @@ class _InstanceVar(_Var):
         raise TypeError(f"Cannot assign non-input of instance of {cn}::{mn}")
 
 
-def _logic_value(value: OpType) -> OpType:
+def _logic_value(value: OpType) -> _IntExpr:
     if isinstance(value, _Expr):
         type = value.type
         kind = type.kind
@@ -587,6 +585,12 @@ CodeListItemType = Tuple[Any, ...]
 
 class _CodeBuilder:
     """Represents a module when generating code"""
+
+    _name: str
+    _module: MODULE
+    _data: dict[str, tuple]
+    _code: list[tuple]
+    _db: DB
 
     _VARS = set(("_name", "_module", "_data", "_db", "_code"))
 
@@ -654,7 +658,7 @@ class _CodeBuilder:
         return "\n".join(text)
 
     @contextmanager
-    def if_stmt(self, expr):
+    def if_stmt(self, expr: _IntExpr):
         code = self._code
         self._code = []
         try:
@@ -664,7 +668,7 @@ class _CodeBuilder:
             self._code = code
 
     @contextmanager
-    def elif_stmt(self, expr):
+    def elif_stmt(self, expr: _IntExpr):
         assert self._code[-1][0] in ("when", "else-when")
         code = self._code
         self._code = []

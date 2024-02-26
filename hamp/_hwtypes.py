@@ -2,7 +2,7 @@
 Hardware modelling types
 """
 
-from typing import Dict, Union
+from typing import Dict, Union, Optional
 from ._show import show_type
 
 
@@ -51,7 +51,7 @@ class _HWType:
     _bitsize: int
     _maxval: int
     _minval: int
-    expr: Union[tuple, list]
+    expr: tuple
 
     def __init__(self, *params):
         if len(params) == 1:
@@ -130,16 +130,17 @@ def hwtype(*expr) -> _HWType:
         _hwtype_cache[eid] = h
         return h
     eid = id(expr[0])
-    if h := _hwtype_cache.get(eid):
+    if (h := _hwtype_cache.get(eid)) is not None:
         return h
     h = _hwtype_cache[eid] = _HWType(*expr)
     return h
 
 
-_min_max_cache: dict[tuple, tuple[int, int]] = {}
+IORN = Optional[int]
+_min_max_cache: dict[tuple, tuple[IORN, IORN]] = {}
 
 
-def _min_max(type: (str, int)) -> (int, int):
+def _min_max(type: tuple[str, int]) -> tuple[IORN, IORN]:
     if x := _min_max_cache.get(type):
         return x
     size = type[1]
