@@ -1,7 +1,11 @@
 import inspect
 import ast
+import re
 from tokenize import generate_tokens, untokenize, INDENT
 from io import StringIO
+
+
+_comment = re.compile(r"#.*$")
 
 
 def _dedent(s):
@@ -16,7 +20,8 @@ def parse_func(func):
     """Parse function source and return AST"""
     source = _dedent(inspect.getsource(func))
     empty_lines = [
-        i for i, line in enumerate(source.splitlines()) if not line.strip()
+        i for i, line in enumerate(source.splitlines())
+        if not _comment.sub("", line).strip()
     ]
     tree = compile(
         source,
