@@ -1,8 +1,11 @@
 """
 Convert to FIRRTL
 """
-
-from ._db import DB
+from typing import Optional
+import os
+from subprocess import run
+from contextlib import chdir
+from ._db import DB, default
 
 
 def _op1(name, argc=1, parc=0):
@@ -202,12 +205,37 @@ def _circuit(name: str, db: DB, lines: list[str]) -> None:
         _module(name, mname, db, lines)
 
 
-def generate(db: DB) -> str:
+def generate(*circuits: str, db: Optional[DB] = None) -> str:
     """
-    Generate and return FIRRTL code for given database (intermediate format).
+    Generate and return FIRRTL code for given database and circuits
+    Generate FIRRTL for all circuits if none is specified.
+    Use default database if none is specified.
     """
     lines = [_preamble()]
-    circuits = db["circuits"]
+    db = db or default
+    circuits = circuits or db["circuits"].keys()
     for name in circuits:
         _circuit(name, db, lines)
     return "\n".join(lines)
+
+
+def verilog(
+    *circuits: str,
+    db: Optional[DB] = None,
+    name: Optional[str] = None,
+    odir: str = ".",
+) -> None:
+    """
+    Generate FIRRTL, and then run firtool to convert it to Verilog
+    """
+    db = db or default
+    circuits = circuits or list(db["circuits"].keys())
+    name = name or circuits[0]
+    with chdir(odir):
+        with open(f"{name}.fir", "w") as fh:
+            fh.write(generate(*circuits, db=db))
+        firtool = os.environ.get("FIRTOOL") or "firtool"
+        args = [firtool, "--verilog", f"-o={name}.v", f"{name}.fir"]
+        r = run(args)
+        if r.returncode != 0:
+            raise RuntimeError("firtool returned non-zero exit code")

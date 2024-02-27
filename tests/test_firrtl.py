@@ -1,4 +1,4 @@
-from hamp._firrtl import generate
+from hamp._firrtl import generate, verilog
 from hamp._module import module, input, output, wire, register
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
@@ -6,25 +6,25 @@ from hamp._memory import memory, wmask_type
 from hamp._db import validate, create
 from hamp._stdlib import cat
 from os.path import dirname, abspath
-import os
 from pprint import pprint
 
 
 _this = dirname(abspath(__file__))
 
 
-def _generate_and_check(name, *m):
+def _generate_and_check(name, *m):  # pragma: no cover
     db = m[0].db
     with open(f"{_this}/{name}.db", "w") as fh:
         pprint(db, stream=fh, sort_dicts=False, indent=4)
     validate(db)
-    code = generate(db)
-    with open(f"{_this}/{name}.fir", "w") as fh:
-        fh.write(code)
-    if firtool := os.environ.get("FIRTOOL"):
-        assert (
-            os.system(f"{firtool} {_this}/{name}.fir -o {_this}/{name}.v")
-        ) == 0
+    try:
+        verilog(db=db, name=name, odir=_this)
+        with open(f"{_this}/{name}.fir") as fh:
+            code = fh.read()
+    except FileNotFoundError:
+        code = generate(db=db)
+        with open(f"{_this}/{name}.fir", "w") as fh:
+            fh.write(code)
     with open(f"{_this}/{name}_exp.fir") as fh:
         assert fh.read() == code
 
@@ -37,7 +37,7 @@ def test_simple():
     m.w = wire(uint[3])
 
     @m.code
-    def f(b):  # pragma: no cover
+    def f(b):
         if b.en:
             b.w = b.x + 1
         else:
@@ -61,11 +61,11 @@ def test_counter():
         return x + 2
 
     @m.function
-    def inc(x, delta=1):  # pragma: no cover
+    def inc(x, delta=1):
         x.cnt = (x.cnt + delta)[w - 1 : 0]
 
     @m.code
-    def main(x):  # pragma: no cover
+    def main(x):
         if x.en:
             inc(x, add2(1))
         x.out = x.cnt
@@ -95,7 +95,7 @@ def test_struct():
     m.y = register(Data[3], m.clk)
 
     @m.code
-    def main(x):  # pragma: no cover
+    def main(x):
         x.x = x.din.data
         x.y[x.sel] = x.din.data
         x.dout.data = x.x
@@ -137,7 +137,7 @@ def test_index():
     m.b = input(sint[10])
 
     @m.code
-    def main(x):  # pragma: no cover
+    def main(x):
         x.z = cat(x.a[x.x][x.y], x.b)
 
     _generate_and_check("index", m)
@@ -158,7 +158,7 @@ def test_instantiation():
     m.sel = input(uint[1])
 
     @m.code
-    def main(m):  # pragma: no cover
+    def main(m):
         if m.sel:
             m.x = m.b
         else:
@@ -176,7 +176,7 @@ def test_instantiation():
     m.m3 = mux()
 
     @m.code
-    def main2(m):  # pragma: no cover
+    def main2(m):
         m.m1.a = m.a[0]
         m.m1.b = m.a[1]
         m.m1.sel = m.sel[0]
@@ -200,7 +200,7 @@ def test_logic_expr():
     m.y = output(uint[3])
 
     @m.code
-    def main(m):  # pragma: no cover
+    def main(m):
         m.x = m.a and m.b and m.c
         m.y = 0
         if not m.a:
@@ -244,7 +244,7 @@ def test_composit_data_types():
     m.rsel = input(uint[1])
 
     @m.code
-    def main(m):  # pragma: no cover
+    def main(m):
         m.z[0] = m.r3[m.rsel].a.g[m.gsel][m.zsel]
         m.z[1] = m.r.b.z[m.zsel]
         m.z[2] = m.c2[m.rsel].x
