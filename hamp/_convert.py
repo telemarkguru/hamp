@@ -43,7 +43,6 @@ class _Replacer(ast.NodeTransformer):
         self.var = var
         self.module = module
         self.data = module["data"]
-        self.in_attr = False
         self.hw_types = 0
 
     def visit_If(self, node):
@@ -81,10 +80,6 @@ class _Replacer(ast.NodeTransformer):
 
     def visit_Attribute(self, node):
         """Figure out if top level attribute access is to a hardware type"""
-        if self.in_attr:
-            self.generic_visit(node)
-            return node
-        self.in_attr = True
         self.generic_visit(node)
         if isinstance(node.value, ast.Name):
             if (
@@ -93,7 +88,6 @@ class _Replacer(ast.NodeTransformer):
                 and self.data[node.attr][0] != "attribute"
             ):
                 self.hw_types += 1
-        self.in_attr = False
         return node
 
 
