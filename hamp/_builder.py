@@ -7,12 +7,13 @@ from ._db import MODULE, DB
 from ._hwtypes import (
     equal,
     _HWType,
+    _HWValue,
 )
 from ._show import show_type, show_expr
 from ._struct import member, flipped
 
 
-OpType = Union["_IntExpr", int]
+OpType = Union["_IntExpr", int, _HWValue]
 
 
 class _Expr:
@@ -163,6 +164,13 @@ def _infer_int(type: tuple, value: int) -> _ConstExpr:
     return _ConstExpr(value, k == "sint", type[1])
 
 
+def _int_value(v: _HWValue):
+    kind, size = v.expr[0][0:2]
+    if kind in ("uint", "sint"):
+        return _IntExpr(v.expr)
+    raise TypeError(f"Cannot create integer constant from {kind} value")
+
+
 class _BitsExpr(_IntExpr):
     """bits, a.k.a. [msb:lsb]"""
 
@@ -179,20 +187,24 @@ class _TwoOpExpr(_IntExpr):
     op: str
 
     def __init__(self, v1: OpType, v2: OpType, v2signed=None):
-        assert isinstance(v1, (int, _IntExpr))
-        assert isinstance(v2, (int, _IntExpr))
+        assert isinstance(v1, (int, _IntExpr, _HWValue))
+        assert isinstance(v2, (int, _IntExpr, _HWValue))
         if isinstance(v1, _IntExpr):
             s1 = v1.type.signed
             if isinstance(v2, int):
                 if v2signed is not None:
                     s1 = v2signed
                 v2 = _ConstExpr(v2, s1)
+            elif isinstance(v2, _HWValue):
+                v2 = _int_value(v2)
         if isinstance(v2, _IntExpr):
             s2 = v2.type.signed
             if isinstance(v1, int):
                 v1 = _ConstExpr(v1, s2)
-        assert isinstance(v1, _IntExpr)
-        assert isinstance(v2, _IntExpr)
+            elif isinstance(v1, _HWValue):
+                v1 = _int_value(v1)
+        assert isinstance(v1, _IntExpr), f"v1={v1}"
+        assert isinstance(v2, _IntExpr), f"v2={v2}"
         self.check_types(v1, v2)
         super().__init__(
             (self.infer_type(v1, v2), (self.op, v1.expr, v2.expr))
@@ -348,7 +360,7 @@ def _reduce2(cls: Type[_TwoOpExpr], *ops: OpType) -> _IntExpr:
 class _OneOpExpr(_IntExpr):
     op: str
 
-    def __init__(self, v1: OpType):
+    def __init__(self, v1: _Expr):
         assert isinstance(v1, _Expr)
         t = self.infer_type(v1)
         super().__init__((t, (self.op, v1.expr)))
@@ -612,6 +624,9 @@ class _CodeBuilder:
             access = Access.WR
         return _vartype((item[1], name), access, self)
 
+    def __getitem__(self, name: str) -> _Var:
+        return self.__getattr__(name)
+
     def __setattr__(self, name: str, value) -> None:
         """Assign value"""
         if name in _CodeBuilder._VARS:
@@ -632,6 +647,9 @@ class _CodeBuilder:
             self._code.append(("connect", (item[1], name), value.expr))
         else:
             raise TypeError(f"Cannot assign to {kind} {name}")
+
+    def __setitem__(self, name: str, value) -> None:
+        self.__setattr__(name, value)
 
     def __str__(self) -> str:
         text = []

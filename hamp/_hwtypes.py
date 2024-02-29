@@ -161,7 +161,35 @@ def _min_max(type: tuple[str, int]) -> tuple[IORN, IORN]:
     return minv, maxv
 
 
-def hwvalue(type: tuple, *args, **kwargs):
+class _HWValue:
+    expr: tuple
+    type: _HWType
+
+    def __init__(self, expr):
+        self.expr = expr
+        self.type = hwtype(expr[0])
+
+    def __len__(self):
+        return len(self.type)
+
+    def __getattr__(self, name: str) -> Union[int, dict, list]:
+        if self.expr[0][0] == "struct":
+            return self.value[name]
+        raise TypeError(f"Cannot get attribute of {self.expr[0][0]}")
+
+    def __getitem__(self, name_idx: Union[str, int]) -> Union[int, dict, list]:
+        if self.expr[0][0] == "struct":
+            return self.__getattr__(name_idx)
+        if self.expr[0][0] == "array":
+            return self.value[name_idx]
+        raise TypeError(f"Cannot get item of {self.expr[0][0]}")
+
+    @property
+    def value(self) -> Union[int, dict, list]:
+        return self.expr[1]
+
+
+def _hwvalue(type: tuple, *args, **kwargs):
     """
     Return value for given type
     """
@@ -182,8 +210,8 @@ def hwvalue(type: tuple, *args, **kwargs):
         t = type[2]
         s = type[1]
         args = args[:s]
-        value = [hwvalue(t, x) for x in args] + [
-            hwvalue(t) for _ in range(s - len(args))
+        value = [_hwvalue(t, x) for x in args] + [
+            _hwvalue(t) for _ in range(s - len(args))
         ]
     elif k == "struct":
         if args and isinstance(args[0], dict):
@@ -192,7 +220,7 @@ def hwvalue(type: tuple, *args, **kwargs):
         else:
             kw = kwargs
         value = {
-            k: hwvalue(t, v) if (v := kw.get(k)) else hwvalue(t)
+            k: _hwvalue(t, v) if (v := kw.get(k)) else _hwvalue(t)
             for k, t, _ in type[1:]
         }
     else:
@@ -200,6 +228,13 @@ def hwvalue(type: tuple, *args, **kwargs):
         if value not in (0, 1):
             raise ValueError(f"{k} cannot hold the value {value:#x}")
     return value
+
+
+def hwvalue(type: tuple, *args, **kwargs):
+    """
+    Return value for given type
+    """
+    return _HWValue((type, _hwvalue(type, *args, **kwargs)))
 
 
 class _IntFactory:

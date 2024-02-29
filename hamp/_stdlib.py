@@ -34,7 +34,9 @@ def cat(*ops: _IntExpr) -> _TwoOpExpr:
 
 def pad(op: _IntExpr, bits: int) -> _IntExpr:
     nbits = max(bits, len(op))
-    return _IntExpr((op.new_type(nbits), ("pad", op.expr, bits)))
+    return _IntExpr(
+        (op.new_type(nbits), ("pad", op.expr, (("uint", 0), bits)))
+    )
 
 
 def as_uint(op: _IntExpr) -> _IntExpr:

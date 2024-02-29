@@ -11,7 +11,7 @@ def test_basic_struct():
 
     a = Foo()
     assert a["a"] == 0
-    assert a["b"] == 0
+    assert a.b == 0
     assert Foo.a == uint[1]
     assert Foo.b == sint[2]
     assert member(Foo, "a") == uint[1]
@@ -46,7 +46,7 @@ def test_hier_struct():
     assert x["a"]["b"] == 2
     assert x["b"]["a"] == 0
     assert x["b"]["b"] == 0
-    x["b"]["a"] = uint[3](7)
+    x["b"]["a"] = 7
     assert x["b"]["a"] == 7
 
     assert list(members(Foo)) == [("a", sint[1]), ("b", uint[3])]

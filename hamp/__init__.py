@@ -20,7 +20,10 @@ from ._module import (
 from ._struct import (
     struct,
 )
-from ._firrtl import generate as generate_firrtl
+from ._firrtl import firrtl, verilog
+
+from ._stdlib import cat, pad
+
 
 __all__ = (
     "uint",
@@ -39,5 +42,8 @@ __all__ = (
     "unique",
     "instance",
     "struct",
-    "generate_firrtl",
+    "firrtl",
+    "verilog",
+    "cat",
+    "pad",
 )

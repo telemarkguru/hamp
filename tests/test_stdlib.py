@@ -90,10 +90,10 @@ def test_pad():
         m.s3 = pad(m.s2, 1)
 
     assert m.bld._code == [
-        ("connect", u4, _uint(4, ("pad", u1, 4))),
-        ("connect", u4, _uint(2, ("pad", u2, 1))),
-        ("connect", s3, _sint(3, ("pad", s1, 3))),
-        ("connect", s3, _sint(2, ("pad", s2, 1))),
+        ("connect", u4, _uint(4, ("pad", u1, _uint(0, 4)))),
+        ("connect", u4, _uint(2, ("pad", u2, _uint(0, 1)))),
+        ("connect", s3, _sint(3, ("pad", s1, _uint(0, 3)))),
+        ("connect", s3, _sint(2, ("pad", s2, _uint(0, 1)))),
     ]
 
 

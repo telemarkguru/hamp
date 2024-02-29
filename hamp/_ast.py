@@ -20,7 +20,8 @@ def parse_func(func):
     """Parse function source and return AST"""
     source = _dedent(inspect.getsource(func))
     empty_lines = [
-        i for i, line in enumerate(source.splitlines())
+        i
+        for i, line in enumerate(source.splitlines())
         if not _comment.sub("", line).strip()
     ]
     tree = compile(

@@ -1,4 +1,4 @@
-from hamp._firrtl import generate, verilog
+from hamp._firrtl import firrtl, verilog
 from hamp._module import module, input, output, wire, register
 from hamp._hwtypes import uint, sint, u1, clock, async_reset
 from hamp._struct import struct, flip
@@ -22,7 +22,7 @@ def _generate_and_check(name, *m):  # pragma: no cover
         with open(f"{_this}/{name}.fir") as fh:
             code = fh.read()
     except FileNotFoundError:
-        code = generate(db=db)
+        code = firrtl(db=db)
         with open(f"{_this}/{name}.fir", "w") as fh:
             fh.write(code)
     with open(f"{_this}/{name}_exp.fir") as fh:

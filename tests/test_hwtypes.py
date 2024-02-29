@@ -13,11 +13,11 @@ def _test_int(int_type, kind):
     w = int_type[2]
     assert z is w
     v = w(1)
-    assert isinstance(v, int)
-    assert v == 1
+    assert isinstance(v, hw._HWValue)
+    assert v.value == 1
     unsized = int_type(100)
     assert int_type.unsized.expr[1] == 0
-    assert unsized == 100
+    assert unsized.value == 100
 
 
 def test_uint():
@@ -45,20 +45,21 @@ def _assert_value_error(type, value):
 
 def test_uint_values():
     t1 = hw.uint[1]
-    assert t1(1) == 1
-    assert t1(0) == 0
+    assert t1(1).value == 1
+    assert t1(0).value == 0
     _assert_value_error(t1, -1)
     _assert_value_error(t1, 2)
     t2 = hw._HWType(("uint", 2))
+    assert len(t2()) == 2
     for i in range(4):
-        assert t2(i) == i
+        assert t2(i).value == i
     _assert_value_error(t2, -1)
     _assert_value_error(t2, -2)
     _assert_value_error(t2, 4)
     _assert_value_error(t2, 5)
     tu = hw.uint
-    assert tu(0) == 0
-    assert tu(100000000) == 100000000
+    assert tu(0).value == 0
+    assert tu(100000000).value == 100000000
     _assert_value_error(hw.uint.unsized, -1)
     assert len(t1) == 1
     assert len(hw.uint[10]) == 10
@@ -66,13 +67,13 @@ def test_uint_values():
 
 def test_sint_values():
     t1 = hw.sint[1]
-    assert t1(-1) == -1
-    assert t1(0) == 0
+    assert t1(-1).value == -1
+    assert t1(0).value == 0
     _assert_value_error(t1, -2)
     _assert_value_error(t1, 1)
     t2 = hw.sint[2]
     for i in range(-2, 2):
-        assert t2(i) == i
+        assert t2(i).value == i
     _assert_value_error(t2, -3)
     _assert_value_error(t2, -4)
     _assert_value_error(t2, 2)
@@ -97,8 +98,8 @@ def test_clock_reset():
     assert len(t2) == 1
     assert str(t1) == "clock"
     assert str(t2) == "reset"
-    assert t1(0) == 0
-    assert t1(1) == 1
+    assert t1(0).value == 0
+    assert t1(1).value == 1
     _assert_value_error(t1, 2)
 
 

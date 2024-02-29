@@ -80,8 +80,8 @@ def test_code_builder():
 
     b.x = b.y + b.z
     with b.if_stmt(b.y == b.z):
-        b.x = 7
-    with b.elif_stmt(b.y > b.z):
+        b["x"] = 7
+    with b.elif_stmt(b.y > b["z"]):
         b.x = 10
     with b.else_stmt():
         b.x = 0
@@ -506,3 +506,13 @@ def test_size_len():
     assert len(b.r) == 20
     z = (b.y + b.z + b.b.c.a) >> 3
     assert len(z) == 12 - 3
+
+
+def test_sized_values():
+    b = _setup()
+    z = b.y + uint[20](1)
+    assert len(z) == 21
+    z = sint[30](-20) + b.xs
+    assert len(z) == 31
+    with raises(TypeError, match="Cannot create integer constant from struct"):
+        b.xs + A()

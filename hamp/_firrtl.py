@@ -52,6 +52,7 @@ _op_to_func = {
     "orr": _op1("orr"),
     "xorr": _op1("xorr"),
     "cat": _op2("cat"),
+    "pad": _op2("pad", 1, 1),
     "bits": _op3("bits", 1, 2),
     ".": ("{e[0]}.{e[1]}", 1, 1),
     "[]": ("{e[0]}[{e[1]}]", 2, 0),
@@ -205,7 +206,7 @@ def _circuit(name: str, db: DB, lines: list[str]) -> None:
         _module(name, mname, db, lines)
 
 
-def generate(*circuits: str, db: Optional[DB] = None) -> str:
+def firrtl(*circuits: str, db: Optional[DB] = None) -> str:
     """
     Generate and return FIRRTL code for given database and circuits
     Generate FIRRTL for all circuits if none is specified.
@@ -233,7 +234,7 @@ def verilog(
     name = name or circuits[0]
     with chdir(odir):
         with open(f"{name}.fir", "w") as fh:
-            fh.write(generate(*circuits, db=db))
+            fh.write(firrtl(*circuits, db=db))
         firtool = os.environ.get("FIRTOOL") or "firtool"
         args = [firtool, "--verilog", f"-o={name}.v", f"{name}.fir"]
         r = run(args)

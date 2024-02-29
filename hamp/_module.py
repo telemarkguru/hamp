@@ -293,7 +293,7 @@ def _find_clock(module: _Module) -> str:
 
 def _find_reset(module: _Module) -> str:
     for name, item in module.module["data"].items():
-        if item[1] == ("reset", 1):
+        if item[1] in (("reset", 1), ("async_reset", 1)):
             return name
     raise ValueError(f"No reset defined in module {module.name}")
 
