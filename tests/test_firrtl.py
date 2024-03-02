@@ -19,12 +19,10 @@ def _generate_and_check(name, *m):  # pragma: no cover
     validate(db)
     try:
         verilog(db=db, name=name, odir=_this)
-        with open(f"{_this}/{name}.fir") as fh:
-            code = fh.read()
     except FileNotFoundError:
-        code = firrtl(db=db)
-        with open(f"{_this}/{name}.fir", "w") as fh:
-            fh.write(code)
+        firrtl(db=db, name=name, odir=_this)
+    with open(f"{_this}/{name}.fir") as fh:
+        code = fh.read()
     with open(f"{_this}/{name}_exp.fir") as fh:
         assert fh.read() == code
 
