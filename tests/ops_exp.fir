@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit ops :
 
-  module ops :
+  public module ops :
     input a : UInt<8>
     input b : UInt<8>
     input c : SInt<8>

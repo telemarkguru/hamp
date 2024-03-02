@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit memories :
 
-  module memories :
+  public module memories :
     input clk : Clock
     input addr : UInt<8>
     input we : UInt<1>

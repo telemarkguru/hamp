@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit struct :
 
-  module struct :
+  public module struct :
     input clk : Clock
     input din : {valid: UInt<1>, flip ready: UInt<1>, data: {x: UInt<12>, y: SInt<12>[3]}, data2: {x: UInt<12>, y: SInt<12>[3]}[3]}
     input sel : UInt<2>

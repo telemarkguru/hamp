@@ -61,7 +61,7 @@ _op_to_func = {
 }
 
 
-def _preamble(version: str = "1.1.0") -> str:
+def _preamble(version: str = "4.2.0") -> str:
     """Return FIRRTL header"""
     return f"FIRRTL version {version}"
 
@@ -120,10 +120,13 @@ def _type_field(name: str, type: tuple, flip) -> str:
     return f"{flip}{name}: {_type(type)}"
 
 
-def _reset(reset, type) -> str:
-    if reset == 0:
-        return ""
-    return f" with: (reset => ({reset[0]}, {_expr((type, reset[1]))}))"
+def _register(name, r):
+    type = _type(r[1])
+    if r[3] == 0:
+        return f"    reg {name} : {type}, {r[2]}"
+    else:
+        rname, rval = r[3]
+        return f"    regreset {name} : {type}, {r[2]}, {rname}, {_expr((r[1], rval))}"
 
 
 def _statements(code: list[tuple], lines: list[str]) -> None:
@@ -166,7 +169,8 @@ def _memory(name: str, attr: dict, lines: list[str]) -> None:
 
 def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
     """Generate FIRRTL code for module"""
-    lines += ["", f"  module {mname} :"]
+    pub = "public " if mname == cname else ""
+    lines += ["", f"  {pub}module {mname} :"]
     m = db["circuits"][cname][mname]
     data = m["data"]
     for pdir in ("input", "output"):
@@ -179,9 +183,7 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
         lines.append(f"    wire {wname} : {_type(w[1])}")
     for rname in m["register"]:
         r = data[rname]
-        lines.append(
-            f"    reg {rname} : {_type(r[1])}, {r[2]}{_reset(r[3], r[1])}"
-        )
+        lines.append(_register(rname, r))
     for iname in m["instance"]:
         i = data[iname]
         cn, mn = i[1][1:3]
@@ -206,18 +208,26 @@ def _circuit(name: str, db: DB, lines: list[str]) -> None:
         _module(name, mname, db, lines)
 
 
-def firrtl(*circuits: str, db: Optional[DB] = None) -> str:
+def firrtl(
+    *circuits: str,
+    db: Optional[DB] = None,
+    name: Optional[str] = None,
+    odir: str = ".",
+) -> None:
     """
-    Generate and return FIRRTL code for given database and circuits
+    Generate FIRRTL code for given database and circuits.
     Generate FIRRTL for all circuits if none is specified.
     Use default database if none is specified.
     """
     lines = [_preamble()]
     db = db or default
     circuits = circuits or db["circuits"].keys()
-    for name in circuits:
-        _circuit(name, db, lines)
-    return "\n".join(lines)
+    name = name or circuits[0]
+    for circ in circuits:
+        _circuit(circ, db, lines)
+    with chdir(odir):
+        with open(f"{name}.fir", "w") as fh:
+            fh.write("\n".join(lines))
 
 
 def verilog(
@@ -232,9 +242,8 @@ def verilog(
     db = db or default
     circuits = circuits or list(db["circuits"].keys())
     name = name or circuits[0]
+    firrtl(*circuits, db=db, name=name, odir=odir)
     with chdir(odir):
-        with open(f"{name}.fir", "w") as fh:
-            fh.write(firrtl(*circuits, db=db))
         firtool = os.environ.get("FIRTOOL") or "firtool"
         args = [firtool, "--verilog", f"-o={name}.v", f"{name}.fir"]
         r = run(args)

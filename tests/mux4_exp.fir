@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit mux :
 
-  module mux :
+  public module mux :
     input a : {x: UInt<2>, y: SInt<3>}
     input b : {x: UInt<2>, y: SInt<3>}
     input sel : UInt<1>
@@ -15,7 +15,7 @@ circuit mux :
 
 circuit mux4 :
 
-  module mux4 :
+  public module mux4 :
     input a : {x: UInt<2>, y: SInt<3>}[4]
     input sel : UInt<2>
     output x : {x: UInt<2>, y: SInt<3>}

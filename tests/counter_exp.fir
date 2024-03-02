@@ -1,13 +1,13 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit test :
 
-  module test :
+  public module test :
     input clk : Clock
     input rst : AsyncReset
     input en : UInt<1>
     output out : UInt<10>
 
-    reg cnt : UInt<10>, clk with: (reset => (rst, UInt<10>(0)))
+    regreset cnt : UInt<10>, clk, rst, UInt<10>(0)
 
     when en :
         cnt <= bits(add(cnt, UInt<2>(3)), 9, 0)

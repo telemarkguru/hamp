@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit logexp :
 
-  module logexp :
+  public module logexp :
     input a : UInt<3>
     input b : SInt<4>
     input c : UInt<1>

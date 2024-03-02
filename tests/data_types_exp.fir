@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit data_types :
 
-  module data_types :
+  public module data_types :
     input a : {r: SInt<32>, i: SInt<32>}
     input c : {x: {r: SInt<32>, i: SInt<32>}, y: {r: SInt<32>, i: SInt<32>}, z: {r: SInt<32>, i: SInt<32>}[4], g: {r: SInt<32>, i: SInt<32>}[4][2]}
     input c2 : {x: {r: SInt<32>, i: SInt<32>}, y: {r: SInt<32>, i: SInt<32>}, z: {r: SInt<32>, i: SInt<32>}[4], g: {r: SInt<32>, i: SInt<32>}[4][2]}[2]

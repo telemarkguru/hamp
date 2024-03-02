@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit test :
 
-  module test :
+  public module test :
     input x : UInt<1>
     input en : UInt<1>
     output y : UInt<4>

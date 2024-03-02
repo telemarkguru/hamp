@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit functional :
 
-  module functional :
+  public module functional :
     input i : UInt<10>[5]
     output o : UInt<14>
     output c : UInt<4>

@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit composit_register :
 
-  module composit_register :
+  public module composit_register :
     input clk : Clock
     input rst : AsyncReset
     input r : SInt<20>

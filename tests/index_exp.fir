@@ -1,7 +1,7 @@
-FIRRTL version 1.1.0
+FIRRTL version 4.2.0
 circuit index :
 
-  module index :
+  public module index :
     input a : SInt<8>[4][3]
     input x : UInt<2>
     input y : UInt<2>
