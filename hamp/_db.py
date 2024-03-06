@@ -386,9 +386,9 @@ def _validate_value(type: tuple, value, vars: VARS) -> None:
                     raise ValueError(f"Struct {type} has no field {k}")
                 _validate_value(fields[k], v, vars)
         case list(x) if tname == "array":
-            if len(x) != type[1]:
+            if len(x) > type[1]:
                 raise ValueError(
-                    f"Wrong number of array values: {len(x)} != {type[1]}"
+                    f"Too many array values: {len(x)} > {type[1]}"
                 )
             for v in x:
                 _validate_value(type[2], v, vars)

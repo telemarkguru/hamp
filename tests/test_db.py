@@ -348,7 +348,7 @@ def test_validate_values():
             ("connect", (t2, "p3"), (t2, {"f1": {"fx": 3}})),
         ]
         validate(db)
-    with raises(ValueError, match="Wrong number of array values: 8 != 7"):
+    with raises(ValueError, match="Too many array values: 8 > 7"):
         ok["code"] = [
             ("connect", (t2, "p3"), (t2, {"f1": {"f2": 3, "f3": [1] * 8}})),
         ]

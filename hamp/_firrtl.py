@@ -66,7 +66,7 @@ def _preamble(version: str = "4.2.0") -> str:
     return f"FIRRTL version {version}"
 
 
-def _expr(x: tuple, k=False) -> str:
+def _expr(x: tuple, consts: list[tuple] = [], k=False) -> str:
     if isinstance(x, str) and k:
         return x
     t, v = x
@@ -81,12 +81,16 @@ def _expr(x: tuple, k=False) -> str:
         case (str(op), *args):
             if op in ("<<", ">>") and isinstance(args[1][1], int):
                 opstr, _, _ = _op_to_func[f"{op}k"]
-                return opstr.format(e=[_expr(args[0]), args[1][1]])
+                return opstr.format(e=[_expr(args[0], consts), args[1][1]])
             else:
                 opstr, argc, parc = _op_to_func[op]
-                e = [_expr(z, i >= argc) for i, z in enumerate(args)]
+                e = [_expr(z, consts, i >= argc) for i, z in enumerate(args)]
                 f = opstr.format(e=e)
                 return f
+        case dict(_) | list(_):
+            cname = f"_K{len(consts)}"
+            consts.append((cname, t, v))
+            return cname
         case _:  # pragma: no cover
             assert False, f"t={t},  v={v}"
 
@@ -120,30 +124,65 @@ def _type_field(name: str, type: tuple, flip) -> str:
     return f"{flip}{name}: {_type(type)}"
 
 
-def _register(name, r):
+def _constval(name, type, value, lines):
+    match type:
+        case ("uint", int(x)):
+            lines.append(f"    connect {name}, UInt<{x}>({value})")
+        case ("sint", int(x)):
+            lines.append(f"    connect {name}, SInt<{x}>({value})")
+        case ("struct", *fields):
+            if value == 0:
+                value = {}
+            for fn, ft, _ in fields:
+                _constval(f"{name}.{fn}", ft, value.get(fn, 0), lines)
+        case ("array", int(x), at):
+            if value == 0:
+                value = [0] * x
+            if len(value) < x:
+                value = value + [0] * (x - len(value))
+            for i in range(x):
+                _constval(f"{name}[{i}]", at, value[i], lines)
+        case _:  # pragma no cover
+            assert False, f"name={name} type={type} value={value}"
+
+
+def _constant(name: str, type: tuple, value, lines: list[str], kpos):
+    """Add a constant, i.e. a wire with constant type"""
+    lines.insert(kpos, f"    wire {name} : const {_type(type)}")
+    _constval(name, type, value, lines)
+
+
+def _register(name, r, consts):
     type = _type(r[1])
     if r[3] == 0:
         return f"    reg {name} : {type}, {r[2]}"
     else:
         rname, rval = r[3]
-        return f"    regreset {name} : {type}, {r[2]}, {rname}, {_expr((r[1], rval))}"
+        return (
+            f"    regreset {name} : {type}, {r[2]}, {rname}, "
+            f"{_expr((r[1], rval), consts)}"
+        )
 
 
-def _statements(code: list[tuple], lines: list[str]) -> None:
+def _statements(
+    code: list[tuple], lines: list[str], consts: list[tuple]
+) -> None:
     def f(code, indent=""):
         for c in code:
             match c:
                 case ("when", expr, statements):
-                    lines.append(f"{indent}when {_expr(expr)} :")
+                    lines.append(f"{indent}when {_expr(expr, consts)} :")
                     f(statements, indent + "    ")
                 case ("else-when", expr, statements):
-                    lines.append(f"{indent}else when {_expr(expr)} :")
+                    lines.append(f"{indent}else when {_expr(expr, consts)} :")
                     f(statements, indent + "    ")
                 case ("else", statements):
                     lines.append(f"{indent}else :")
                     f(statements, indent + "    ")
                 case ("connect", target, value):
-                    lines.append(f"{indent}{_expr(target)} <= {_expr(value)}")
+                    lines.append(
+                        f"{indent}{_expr(target)} <= {_expr(value, consts)}"
+                    )
                 case _:  # pragma: no cover
                     assert False
 
@@ -172,18 +211,20 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
     pub = "public " if mname == cname else ""
     lines += ["", f"  {pub}module {mname} :"]
     m = db["circuits"][cname][mname]
+    consts = []
     data = m["data"]
     for pdir in ("input", "output"):
         for pname in m[pdir]:
             p = data[pname]
             lines.append(f"    {pdir} {pname} : {_type(p[1])}")
     lines.append("")
+    kpos = len(lines)
     for wname in m["wire"]:
         w = data[wname]
         lines.append(f"    wire {wname} : {_type(w[1])}")
     for rname in m["register"]:
         r = data[rname]
-        lines.append(_register(rname, r))
+        lines.append(_register(rname, r, consts))
     for iname in m["instance"]:
         i = data[iname]
         cn, mn = i[1][1:3]
@@ -195,7 +236,12 @@ def _module(cname: str, mname: str, db: DB, lines: list[str]) -> None:
             continue
         lines.append(f"    inst {iname} of {mn}")
     lines.append("")
-    _statements(m["code"], lines)
+    _statements(m["code"], lines, consts)
+    if consts:
+        lines.append("")
+        for i, (cname, ctype, cval) in enumerate(consts):
+            _constant(cname, ctype, cval, lines, kpos + i)
+        lines.insert(kpos + 1, "")
     lines.append("")
 
 

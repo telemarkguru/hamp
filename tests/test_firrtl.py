@@ -274,17 +274,23 @@ def test_composit_register():
     m.clk = input(clock)
     m.rst = input(async_reset)
     m.data = register(C)  # , value=dict(r=0, i=0))
+    m.data2 = register(C[3], value=[])
     m.r = input(sint[20])
     m.i = input(sint[20])
     m.en = input(u1)
+    m.idx = input(uint[2])
     m.x = output(sint[40])
+    m.y = output(sint[40])
 
     @m.code
     def main(m):
         if m.en:
             m.data.r = m.r
             m.data.i = m.i
+            m.data2[m.idx].r = m.r
+            m.data2[m.idx].i = m.i
         m.x = m.data.r * m.data.i
+        m.y = sum([x.r * x.i for x in m.data2])
 
     _generate_and_check("composit_register", m)
 
