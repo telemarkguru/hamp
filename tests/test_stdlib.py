@@ -10,6 +10,7 @@ from hamp._stdlib import (
 )
 from hamp._db import create
 from hamp._hwtypes import uint, sint, clock, async_reset
+from pytest import raises
 
 
 def _setup():
@@ -22,6 +23,7 @@ def _setup():
     m.s3 = wire(sint[3])
     m.c = wire(clock)
     m.ar = wire(async_reset)
+    m.v = wire(uint[2][3])
     return m
 
 
@@ -114,6 +116,12 @@ def test_as_uint():
         ("connect", u2, _uint(1, ("as_uint", u1))),
     ]
 
+    with raises(TypeError, match="Cannot interpret v as uint"):
+
+        @m.code
+        def error(m):
+            m.u4 = as_uint(m.v)
+
 
 def test_as_sint():
     m = _setup()
@@ -131,6 +139,12 @@ def test_as_sint():
         ("connect", s1, _sint(1, ("as_sint", ar))),
         ("connect", s1, _sint(1, ("as_sint", s1))),
     ]
+
+    with raises(TypeError, match="Cannot interpret v as sint"):
+
+        @m.code
+        def error(m):
+            m.u4 = as_sint(m.v)
 
 
 def test_as_clock():
@@ -150,6 +164,12 @@ def test_as_clock():
         ("connect", c, _clock(("as_clock", ar))),
     ]
 
+    with raises(TypeError, match="Cannot interpret v as clock"):
+
+        @m.code
+        def error(m):
+            m.u4 = as_clock(m.v)
+
 
 def test_as_async_reset():
     m = _setup()
@@ -167,3 +187,9 @@ def test_as_async_reset():
         ("connect", ar, _ar(("as_async_reset", c))),
         ("connect", ar, _ar(("as_async_reset", ar))),
     ]
+
+    with raises(TypeError, match="Cannot interpret v as async_reset"):
+
+        @m.code
+        def error(m):
+            m.u4 = as_async_reset(m.v)

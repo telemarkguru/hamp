@@ -43,14 +43,14 @@ def as_uint(op: _IntExpr) -> _IntExpr:
     """Interpret as uint"""
     if op.expr[0][0] in ("uint", "sint", "clock", "reset", "async_reset"):
         return _IntExpr((("uint", len(op)), ("as_uint", op.expr)))
-    raise TypeError(f"Cannot interpret {str(op.type)} as uint")
+    raise TypeError(f"Cannot interpret {str(op)} as uint")
 
 
 def as_sint(op: _IntExpr) -> _IntExpr:
     """Interpret as sint"""
     if op.expr[0][0] in ("uint", "sint", "clock", "reset", "async_reset"):
         return _IntExpr((("sint", len(op)), ("as_sint", op.expr)))
-    raise TypeError(f"Cannot interpret {str(op.type)} as sint")
+    raise TypeError(f"Cannot interpret {str(op)} as sint")
 
 
 def as_clock(op: _IntExpr) -> _Expr:
@@ -63,7 +63,7 @@ def as_clock(op: _IntExpr) -> _Expr:
         ("async_reset", 1),
     ):
         return _Expr((("clock", 1), ("as_clock", op.expr)))
-    raise TypeError(f"Cannot interpret {str(op.type)} as clock")
+    raise TypeError(f"Cannot interpret {str(op)} as clock")
 
 
 def as_async_reset(op: _IntExpr) -> _Expr:
@@ -76,4 +76,4 @@ def as_async_reset(op: _IntExpr) -> _Expr:
         ("async_reset", 1),
     ):
         return _Expr((("async_reset", 1), ("as_async_reset", op.expr)))
-    raise TypeError(f"Cannot interpret {str(op.type)} as async_reset")
+    raise TypeError(f"Cannot interpret {str(op)} as async_reset")
