@@ -56,10 +56,7 @@ class _ModuleMember:
                     raise AttributeError(f"Register {self.name} has no reset")
                 return rst[0]
             elif name == "value":
-                rst = self.data[3]
-                if rst == 0:
-                    raise AttributeError(f"Register {self.name} has no reset")
-                return rst[1]
+                raise AttributeError(f"Register {self.name} has no reset")
         raise TypeError(f"Cannot get attribute {name} of {self.kind}")
 
     @property
@@ -72,6 +69,11 @@ class _ModuleMember:
     def value(self) -> AttrData:
         if self.kind == "attribute":
             return self.data[1]
+        if self.kind == "register":
+            rst = self.data[3]
+            if rst == 0:
+                raise AttributeError(f"Register {self.name} has no reset")
+            return rst[1]
         raise TypeError(f"Cannot get value of {self.kind}")
 
 

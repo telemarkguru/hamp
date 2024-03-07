@@ -46,6 +46,8 @@ def test_member_access_module():
     assert len(m.w) == 4
     assert len(m.w.a) == 2
     assert m.w.a == uint[2]
+    with raises(TypeError, match="Cannot get attribute foo of wire"):
+        m.z.foo
 
 
 def test_module_instance():
@@ -58,11 +60,14 @@ def test_module_instance():
     m.i = sm()
     assert m.i.p.kind == "output"
     m.j = mod.instance("module::submodule")
+    m.z = mod.instance("submodule")
     with raises(NameError, match="No module named h::higgins defined"):
         m.k = mod.instance("h::higgins")
     assert m["i"].name == "module::submodule"
+    assert m.z.name == "module::submodule"
     assert "k" not in m
     assert "j" in m
+    assert "z" in m
 
     """
     with raises(
@@ -103,15 +108,20 @@ def test_module_add_register():
     m = mod.module("foo", db=create())
     m.clk = mod.input(clock)
     m.rst = mod.input(reset)
-    m.reg = mod.register(sint[144], value=0)
+    m.reg = mod.register(sint[144], value=3)
+    m.reg2 = mod.register(uint[2])
     r = m.reg
     assert r.type == sint[144]
-    # assert r.clock is m.clk
-    # assert r.reset is m.rst
-    # assert r.value == 0
+    assert r.clock == "clk"
+    assert r.reset == "rst"
+    assert r.value == 3
     assert len(m.clk) == 1
     assert len(m.rst) == 1
     assert len(m.reg) == 144
+    with raises(AttributeError, match="Register reg2 has no reset"):
+        m.reg2.reset
+    with raises(AttributeError, match="Register reg2 has no reset"):
+        m.reg2.value
 
 
 def test_module_register_no_clock():
@@ -165,3 +175,20 @@ def test_iter_ports():
     m.a = mod.input(u1)
     m.b = mod.output(u1)
     # assert list(mod.ports(m)) == [m.a, m.b]
+
+
+def test_attr_errors():
+    db = create()
+    m = mod.module("t1", db=db)
+    m.a = mod.attribute(42)
+    with raises(TypeError, match="Cannot get type of attribute"):
+        m.a.type
+    m.b = mod.wire(u1)
+    with raises(TypeError, match="Cannot get value of wire"):
+        m.b.value
+    with raises(NameError, match="Module foo::foo not found in database"):
+        mod._Module("foo::foo", db)
+    with raises(AttributeError, match="Module t1::t1 has no member foo"):
+        del m["foo"]
+    with raises(NameError, match="Module t1::t1 already defined"):
+        m.clone("t1::t1")
