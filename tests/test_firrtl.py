@@ -348,3 +348,50 @@ def test_memory():
         m.dout[1] = rw1.rdata
 
     _generate_and_check("memories", m)
+
+
+def test_printf():
+    db = create()
+
+    m = module("print", db=db)
+    m.clk = input(clock)
+    m.en = input(u1)
+
+    @m.code
+    def main(m):
+        m.printf("hello world1")
+        m.printf(m.en, "hello world2 %b", m.en)
+        m.printf(m.clk, "hello world3")
+        m.printf(m.clk, m.en, "hello world4")
+
+    _generate_and_check("printf", m)
+
+
+def _test_predf(kind, p=True):
+    db = create()
+
+    m = module("print", db=db)
+    m.clk = input(clock)
+    m.en = input(u1)
+    m.pred = input(u1)
+
+    @m.code
+    def main(m):
+        f = getattr(m, kind)
+        f(m.pred, "hello world1")
+        if p:
+            f(m.pred, m.en, "hello world2 %b", m.en)
+        else:
+            f(m.pred, m.en, "hello world2")
+        f(m.clk, m.pred, "hello world3")
+        f(m.clk, m.pred, m.en, "hello world4")
+
+    _generate_and_check(kind, m)
+
+
+def test_assertf():
+    _test_predf("assertf")
+
+
+def test_coverf():
+    _test_predf("coverf", False)

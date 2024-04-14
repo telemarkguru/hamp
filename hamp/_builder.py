@@ -6,6 +6,8 @@ from typing import Union, Tuple, Any, Type
 from ._db import MODULE, DB
 from ._hwtypes import (
     equal,
+    clock,
+    u1,
     _HWType,
     _HWValue,
 )
@@ -719,3 +721,96 @@ class _CodeBuilder:
 
     def not_expr(self, op):
         return _NotExpr(_logic_value(op))
+
+    def _find_clk(self):
+        for n, v in self._module["data"].items():
+            if v[1] == ("clock", 1):
+                return self[n]
+        raise ValueError(f"Module {self._name} has no clock")
+
+    def _fmt_stmt(self, kind: str, xargs) -> None:
+        args = list(xargs)
+
+        def _inte(type, args, dflt):
+            if args and isinstance(args[0], _IntExpr) and args[0].type == type:
+                return args[0], args[1:]
+            return dflt(), args
+
+        clk, args = _inte(clock, args, self._find_clk)
+        p1, args = _inte(u1, args, lambda: u1(1))
+        if kind != "printf":
+            p2, args = _inte(u1, args, lambda: u1(1))
+            params = [clk.expr[1], p1.expr, p2.expr]
+        else:
+            params = [clk.expr[1], p1.expr]
+
+        match args:
+            case str(fmt), *pp if kind != "coverf":
+                params.append(fmt)
+                params += [x.expr for x in pp]
+                self._code.append((kind, *params))
+            case str(fmt), if kind == "coverf":
+                params.append(fmt)
+                self._code.append((kind, *params))
+            case _:
+                raise ValueError(f"Malformed {kind} statement: {xargs}")
+
+    def printf(self, *args):
+        """
+        printf statement. Can take a few different forms:
+
+          printf(clock, enable, format-string, *print-arguments)
+          printf(clock, format-string, *print-arguments)
+          printf(enable, format-string, *print-arguments)
+          printf(format-string, *print-arguments)
+
+        If no clock is specified, the first clock defined in the module
+        is used.  If specified it must be of clock type.
+        If no enable expression is specified, it is assumed to be always true.
+        If specified, it must be of type uint[1].
+
+        The format string contains text and format specifiers (%x, %d, %b).
+        For each each format specfier, a print-argument must be supplied,
+        and be of a ground type (uint, sint, clock or async_reset).
+        """
+        self._fmt_stmt("printf", args)
+
+    def assertf(self, *args):
+        """
+        assertf statement. Can take a few different forms:
+
+          assertf(clock, pred, enable, format-string, *print-arguments)
+          assertf(clock, pred, format-string, *print-arguments)
+          assertf(pred, enable, format-string, *print-arguments)
+          assertf(pred, format-string, *print-arguments)
+
+        If no clock is specified, the first clock defined in the module
+        is used.  If specified it must be of clock type.
+        If no enable expression is specified, it is assumed to be always true.
+        If specified, it must be of type uint[1].
+
+        The format string contains text and format specifiers (%x, %d, %b).
+        For each each format specfier, a print-argument must be supplied,
+        and be of a ground type (uint, sint, clock or async_reset).
+        """
+        self._fmt_stmt("assertf", args)
+
+    def coverf(self, *args):
+        """
+        coverf statement. Can take a few different forms:
+
+          coverf(clock, pred, enable, format-string, *print-arguments)
+          coverf(clock, pred, format-string, *print-arguments)
+          coverf(pred, enable, format-string, *print-arguments)
+          coverf(pred, format-string, *print-arguments)
+
+        If no clock is specified, the first clock defined in the module
+        is used.  If specified it must be of clock type.
+        If no enable expression is specified, it is assumed to be always true.
+        If specified, it must be of type uint[1].
+
+        The format string contains text and format specifiers (%x, %d, %b).
+        For each each format specfier, a print-argument must be supplied,
+        and be of a ground type (uint, sint, clock or async_reset).
+        """
+        self._fmt_stmt("coverf", args)

@@ -183,6 +183,33 @@ def _statements(
                     lines.append(
                         f"{indent}{_expr(target)} <= {_expr(value, consts)}"
                     )
+                case ("printf", str(clk), en, str(fstr), *args):
+                    en = _expr(en, consts)
+                    if args:
+                        args = ", " + ", ".join(_expr(x, consts) for x in args)
+                    else:
+                        args = ""
+                    lines.append(
+                        f'{indent}printf({clk}, {en}, "{fstr}"{args})'
+                    )
+                case (
+                    str(kind),
+                    str(clk),
+                    pred,
+                    en,
+                    str(fstr),
+                    *args,
+                ) if kind in ("assertf", "coverf"):
+                    kind = kind[:-1]
+                    pred = _expr(pred, consts)
+                    en = _expr(en, consts)
+                    if args:
+                        args = ", " + ", ".join(_expr(x, consts) for x in args)
+                    else:
+                        args = ""
+                    lines.append(
+                        f'{indent}{kind}({clk}, {pred} {en}, "{fstr}"{args})'
+                    )
                 case _:  # pragma: no cover
                     assert False
 

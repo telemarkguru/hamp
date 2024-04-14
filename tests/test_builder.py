@@ -6,7 +6,7 @@ from hamp._module import (
     attribute,
     register,
 )
-from hamp._hwtypes import uint, sint, clock, reset
+from hamp._hwtypes import uint, sint, clock, reset, u1
 from hamp._struct import struct, flip
 from hamp._db import validate, create
 from hamp._stdlib import cvt, cat
@@ -54,6 +54,8 @@ def _module():
     m.clk = input(clock)
     m.rst = input(reset)
     m.r = register(B)
+    m.en = wire(u1)
+    m.pred = wire(u1)
     m.inst = mi(k=3)
     m.att1 = attribute(3)
     return m, mi
@@ -516,3 +518,40 @@ def test_sized_values():
     assert len(z) == 31
     with raises(TypeError, match="Cannot create integer constant from struct"):
         b.xs + A()
+
+
+def test_printf():
+    b = _setup()
+    b.printf(b.clk, "hello")
+    b.printf("hepp %x", b.y)
+    b.printf(b.en, "hepp %x %b", b.y, b.x)
+    validate(b._db)
+
+
+def test_assertf():
+    b = _setup()
+    f = b.assertf
+    f(b.clk, b.pred, b.en, "hello")
+    f(b.pred, b.en, "hepp %x", b.y)
+    f(b.pred, "hepp %x", b.y)
+    f(b.clk, b.pred, "hepp %x %b", b.y, b.x)
+    validate(b._db)
+
+
+def test_coverf():
+    b = _setup()
+    f = b.coverf
+    f(b.clk, b.pred, b.en, "hello")
+    f(b.pred, b.en, "hepp")
+    f(b.pred, "hepp")
+    f(b.clk, b.pred, "hepp")
+    validate(b._db)
+
+
+def test_bad_pred_stmt():
+    b = _setup()
+    with raises(ValueError, match=r"Malformed printf statement"):
+        b.printf(None)
+    del b._data["clk"]
+    with raises(ValueError, match=r"Module mod::mod has no clock"):
+        b.printf("no clock")

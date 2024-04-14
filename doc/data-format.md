@@ -76,6 +76,9 @@ RESET:
 EXPR:
     (TYPE, VALUE)
 
+EXPRu1:
+    EXPR of type ("uint", 1)
+
 VALUE:
     integer
     VAR
@@ -97,6 +100,14 @@ CODE:
     ("when", (("uint", 1), VALUE), (*CODE), ATTRIBUTES?)
     ("else-when", (("uint", 1), VALUE), (*CODE), ATTRIBUTES?)
     ("else", (*CODE), ATTRIBUTES?)
+    ("printf", CLOCK, EXPRu1, FSTRING, *EXPR)
+    ("assertf", CLOCK, EXPRu1, EXPRu1, FSTRING, *EXPR)
+    ("coverf", CLOCK, EXPRu1, EXPRu1, FSTRING)
+
+FSTRING:
+    "text"  # text may contain format argument placeholders:
+            # %b, %d, %x - where the values are taken from subsequent
+            # expressions.  %% -> %
 
 ATTRIBUTES:
     {}

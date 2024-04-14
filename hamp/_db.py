@@ -4,7 +4,7 @@ Stores module data
 """
 
 import re
-from typing import Union, TypedDict
+from typing import Union, TypedDict, Optional
 
 TL = tuple
 DB = dict[str, dict]
@@ -282,10 +282,60 @@ def _validate_code(name: str, statements: list[tuple], vars: VARS) -> None:
             case ("else", stmnts, *attributes):
                 _validate_code(name, stmnts, vars)
                 _validate_attributes(*attributes)
+            case ("printf", str(clk), (("uint", 1), en), str(fstr), *args):
+                _validate_fmt("printf", clk, en, fstr, args, None, vars)
+            case (
+                "assertf",
+                str(clk),
+                (("uint", 1), pred),
+                (("uint", 1), en),
+                str(fstr),
+                *args,
+            ):
+                _validate_fmt("assertf", clk, en, fstr, args, pred, vars)
+            case (
+                "coverf",
+                str(clk),
+                (("uint", 1), pred),
+                (("uint", 1), en),
+                str(fstr),
+            ):
+                _validate_fmt("coverf", clk, en, fstr, [], pred, vars)
             case _:
                 raise ValueError(
                     f"Malformed statement in module {name}: {statement}"
                 )
+
+
+_arg_ph = re.compile(r"%[bdx]")
+
+
+def _validate_fmt(
+    kind: str,
+    clk: str,
+    en: tuple,
+    fstr: str,
+    args,
+    pred: Optional[tuple],
+    vars: VARS,
+) -> None:
+    _validate_var(("clock", 1), clk, vars)
+    _validate_value(("uint", 1), en, vars)
+    if pred:
+        _validate_value(("uint", 1), pred, vars)
+    for a in args:
+        match a:
+            case type, value:
+                _validate_value(type, value, vars)
+            case _:
+                raise ValueError(f"Malformed expression: {a}")
+        if type[0] not in ("uint", "sint", "clock", "async_reset", "reset"):
+            raise ValueError(f"Not ground type: {type}")
+    ph = _arg_ph.findall(fstr)
+    if len(ph) != len(args):
+        raise ValueError(
+            f"Placeholders vs arguments mismatch {len(ph)} != {len(args)}"
+        )
 
 
 def _validate_type(type: tuple) -> None:

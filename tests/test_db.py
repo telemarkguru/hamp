@@ -443,3 +443,32 @@ def test_redefine_module():
     create_module(db, "flipp", "flopp")
     with raises(NameError, match="Module flipp::flopp already defined"):
         create_module(db, "flipp", "flopp")
+
+
+def test_printf_assertf_coverf():
+    db = _create_db()
+    m = db["circuits"]["foo"]["bar"]
+    u1 = ("uint", 1)
+    m["code"] = [
+        ("printf", "clk", (u1, "x"), "z = %b", (u1, "z")),
+        ("assertf", "clk", (u1, "p"), (u1, "x"), "z = %d", (u1, "z")),
+        ("coverf", "clk", (u1, "p"), (u1, "x"), "z = ?"),
+    ]
+    validate(db)
+
+    with raises(ValueError, match="Malformed expression: Z"):
+        m["code"] = [("printf", "clk", (u1, "x"), "z = %b", "Z")]
+        validate(db)
+
+    m["data"]["z"] = ("wire", t1)
+    with raises(ValueError, match="Not ground type:"):
+        m["code"] = [
+            ("assertf", "clk", (u1, "p"), (u1, "x"), "z = %d", (t1, "z")),
+        ]
+        validate(db)
+
+    with raises(ValueError, match="Placeholders vs arguments mismatch"):
+        m["code"] = [
+            ("assertf", "clk", (u1, "p"), (u1, "x"), "z = %x/%d", (u1, "p")),
+        ]
+        validate(db)
