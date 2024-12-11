@@ -9,9 +9,9 @@ circuit mux :
 
 
     when sel :
-        x <= b
+        connect x, b
     else :
-        x <= a
+        connect x, a
 
 circuit mux4 :
 
@@ -24,13 +24,13 @@ circuit mux4 :
     inst m2 of mux
     inst m3 of mux
 
-    m1.a <= a[UInt(0)]
-    m1.b <= a[UInt<1>(1)]
-    m1.sel <= bits(sel, 0, 0)
-    m2.a <= a[UInt<2>(2)]
-    m2.b <= a[UInt<2>(3)]
-    m2.sel <= bits(sel, 0, 0)
-    m3.a <= m1.x
-    m3.b <= m2.x
-    m3.sel <= bits(sel, 1, 1)
-    x <= m3.x
+    connect m1.a, a[UInt(0)]
+    connect m1.b, a[UInt<1>(1)]
+    connect m1.sel, bits(sel, 0, 0)
+    connect m2.a, a[UInt<2>(2)]
+    connect m2.b, a[UInt<2>(3)]
+    connect m2.sel, bits(sel, 0, 0)
+    connect m3.a, m1.x
+    connect m3.b, m2.x
+    connect m3.sel, bits(sel, 1, 1)
+    connect x, m3.x

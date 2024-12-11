@@ -1,6 +1,7 @@
 """
 Convert to FIRRTL
 """
+
 from typing import Optional
 import os
 from subprocess import run
@@ -181,7 +182,7 @@ def _statements(
                     f(statements, indent + "    ")
                 case ("connect", target, value):
                     lines.append(
-                        f"{indent}{_expr(target)} <= {_expr(value, consts)}"
+                        f"{indent}connect {_expr(target)}, {_expr(value, consts)}"
                     )
                 case ("printf", str(clk), en, str(fstr), *args):
                     en = _expr(en, consts)
@@ -208,7 +209,7 @@ def _statements(
                     else:
                         args = ""
                     lines.append(
-                        f'{indent}{kind}({clk}, {pred} {en}, "{fstr}"{args})'
+                        f'{indent}{kind}({clk}, {pred}, {en}, "{fstr}"{args})'
                     )
                 case _:  # pragma: no cover
                     assert False

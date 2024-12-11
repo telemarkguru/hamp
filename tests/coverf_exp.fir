@@ -7,7 +7,7 @@ circuit print :
     input pred : UInt<1>
 
 
-    cover(clk, pred UInt<1>(1), "hello world1")
-    cover(clk, pred en, "hello world2")
-    cover(clk, pred UInt<1>(1), "hello world3")
-    cover(clk, pred en, "hello world4")
+    cover(clk, pred, UInt<1>(1), "hello world1")
+    cover(clk, pred, en, "hello world2")
+    cover(clk, pred, UInt<1>(1), "hello world3")
+    cover(clk, pred, en, "hello world4")

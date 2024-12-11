@@ -13,6 +13,6 @@ circuit data_types :
     output z : {r: SInt<32>, i: SInt<32>}[3]
 
 
-    z[UInt(0)] <= r3[rsel].a.g[gsel][zsel]
-    z[UInt<1>(1)] <= r.b.z[zsel]
-    z[UInt<2>(2)] <= c2[rsel].x
+    connect z[UInt(0)], r3[rsel].a.g[gsel][zsel]
+    connect z[UInt<1>(1)], r.b.z[zsel]
+    connect z[UInt<2>(2)], c2[rsel].x

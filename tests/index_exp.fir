@@ -9,4 +9,4 @@ circuit index :
     output z : UInt<18>
 
 
-    z <= cat(a[x][y], b)
+    connect z, cat(a[x][y], b)

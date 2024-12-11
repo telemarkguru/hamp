@@ -10,5 +10,5 @@ circuit test :
     regreset cnt : UInt<10>, clk, rst, UInt<10>(0)
 
     when en :
-        cnt <= bits(add(cnt, UInt<2>(3)), 9, 0)
-    out <= cnt
+        connect cnt, bits(add(cnt, UInt<2>(3)), 9, 0)
+    connect out, cnt

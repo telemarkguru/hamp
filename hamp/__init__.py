@@ -19,6 +19,7 @@ from ._module import (
 )
 from ._struct import (
     struct,
+    flip,
 )
 from ._firrtl import firrtl, verilog
 

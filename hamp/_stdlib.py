@@ -1,6 +1,5 @@
 """Standard functions"""
 
-
 from ._builder import _OneOpExpr, _TwoOpExpr, _reduce2, _IntExpr, _Expr
 from ._hwtypes import _HWType
 

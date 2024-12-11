@@ -22,23 +22,23 @@ circuit memories :
         write-latency => 1
         read-under-write => undefined
 
-    ram.r1.en <= re
-    ram.r1.clk <= clk
-    ram.r1.addr <= addr
-    dout[UInt(0)] <= ram.r1.data
-    ram.w1.en <= we
-    ram.w1.clk <= clk
-    ram.w1.addr <= addr
-    ram.w1.data <= din[UInt(0)]
-    ram.w1.mask <= wmask
-    wmask.a <= UInt<1>(1)
-    wmask.b <= UInt<1>(1)
-    wmask.c[UInt(0)] <= UInt<1>(1)
-    wmask.c[UInt<1>(1)] <= UInt<1>(1)
-    ram.rw1.en <= ce
-    ram.rw1.clk <= clk
-    ram.rw1.addr <= addr
-    ram.rw1.wmode <= wmode
-    ram.rw1.wdata <= din[UInt<1>(1)]
-    ram.rw1.wmask <= wmask
-    dout[UInt<1>(1)] <= ram.rw1.rdata
+    connect ram.r1.en, re
+    connect ram.r1.clk, clk
+    connect ram.r1.addr, addr
+    connect dout[UInt(0)], ram.r1.data
+    connect ram.w1.en, we
+    connect ram.w1.clk, clk
+    connect ram.w1.addr, addr
+    connect ram.w1.data, din[UInt(0)]
+    connect ram.w1.mask, wmask
+    connect wmask.a, UInt<1>(1)
+    connect wmask.b, UInt<1>(1)
+    connect wmask.c[UInt(0)], UInt<1>(1)
+    connect wmask.c[UInt<1>(1)], UInt<1>(1)
+    connect ram.rw1.en, ce
+    connect ram.rw1.clk, clk
+    connect ram.rw1.addr, addr
+    connect ram.rw1.wmode, wmode
+    connect ram.rw1.wdata, din[UInt<1>(1)]
+    connect ram.rw1.wmask, wmask
+    connect dout[UInt<1>(1)], ram.rw1.rdata

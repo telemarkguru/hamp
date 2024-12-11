@@ -10,9 +10,9 @@ circuit struct :
     reg x : {x: UInt<12>, y: SInt<12>[3]}, clk
     reg y : {x: UInt<12>, y: SInt<12>[3]}[3], clk
 
-    x <= din.data
-    y[sel] <= din.data
-    dout.data <= x
-    dout.data2 <= y
-    dout.valid <= din.valid
-    din.ready <= dout.ready
+    connect x, din.data
+    connect y[sel], din.data
+    connect dout.data, x
+    connect dout.data2, y
+    connect dout.valid, din.valid
+    connect din.ready, dout.ready

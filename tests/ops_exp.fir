@@ -11,9 +11,9 @@ circuit ops :
     output z : SInt<11>[2]
 
 
-    x[UInt(0)] <= dshr(a, b)
-    x[UInt<1>(1)] <= bits(dshl(a, b), 8, 0)
-    y[UInt(0)] <= dshr(c, b)
-    y[UInt<1>(1)] <= dshl(c, b)
-    z[UInt(0)] <= shl(c, 3)
-    z[UInt<1>(1)] <= shr(c, 2)
+    connect x[UInt(0)], dshr(a, b)
+    connect x[UInt<1>(1)], bits(dshl(a, b), 8, 0)
+    connect y[UInt(0)], dshr(c, b)
+    connect y[UInt<1>(1)], dshl(c, b)
+    connect z[UInt(0)], shl(c, 3)
+    connect z[UInt<1>(1)], shr(c, 2)

@@ -9,11 +9,11 @@ circuit logexp :
     output y : UInt<3>
 
 
-    x <= and(orr(a), and(orr(b), c))
-    y <= UInt<3>(0)
+    connect x, and(orr(a), and(orr(b), c))
+    connect y, UInt<3>(0)
     when not(orr(a)) :
-        y <= UInt<3>(1)
+        connect y, UInt<3>(1)
     else when or(orr(a), c) :
-        y <= UInt<3>(2)
+        connect y, UInt<3>(2)
     else when orr(b) :
-        y <= UInt<3>(3)
+        connect y, UInt<3>(3)
